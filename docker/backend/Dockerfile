@@ -10,8 +10,9 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
-# Create upload directory
-RUN mkdir -p /app/upload
+# Runtime utilities and writable directories
+RUN apk add --no-cache curl \
+    && mkdir -p /app/upload /app/logs
 
 # Environment variables for production (can be overridden)
 ENV SPRING_PROFILES_ACTIVE=prod

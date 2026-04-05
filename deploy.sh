@@ -90,6 +90,12 @@ fi
 # Step 6: Navigate to deployment directory
 cd "$DEPLOY_DIR"
 
+# Step 6.5: Warn about known broken Docker registry mirror settings
+if [ -f /etc/docker/daemon.json ] && grep -q "registry.cn-hangzhou.aliyuncs.com" /etc/docker/daemon.json; then
+    info "Detected registry.cn-hangzhou.aliyuncs.com in /etc/docker/daemon.json"
+    info "If image pulls fail with 'pull access denied' for official images, remove or replace that mirror and restart Docker."
+fi
+
 # Step 7: Check and configure environment variables
 step "6. Configuring environment variables..."
 if [ ! -f .env ]; then

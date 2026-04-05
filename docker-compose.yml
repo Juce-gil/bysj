@@ -45,7 +45,7 @@ services:
     networks:
       - market-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/swagger-ui.html"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -57,7 +57,8 @@ services:
     container_name: market-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "80:80"
     networks:
