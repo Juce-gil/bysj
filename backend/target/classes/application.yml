@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: kecheng-market-backend
+  profiles:
+    active: memory
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 30MB
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.kecheng.market
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-not-delete-value: 0
+      logic-delete-value: 1
+
+market:
+  school-name: 科成校园
+  storage-mode: memory
+  cors:
+    allowed-origin-patterns: "*"
+  jwt:
+    secret: kecheng-market-dev-secret-key-2025
+    expire-hours: 24
+    token-header: Authorization
+    token-prefix: "Bearer "
+  upload:
+    base-dir: upload
