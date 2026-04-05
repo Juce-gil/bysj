@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: market-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: kecheng_campus_market
+      MYSQL_USER: ${DB_USERNAME:-market_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-market_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - market-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./docker/backend/Dockerfile
+    container_name: market-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/kecheng_campus_market
+      DB_USERNAME: ${DB_USERNAME:-market_user}
+      DB_PASSWORD: ${DB_PASSWORD:-market_password}
+      JWT_SECRET: ${JWT_SECRET:-your-production-jwt-secret-key-2025}
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - upload_data:/app/upload
+    networks:
+      - market-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend/Dockerfile
+    container_name: market-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - market-network
+
+volumes:
+  mysql_data:
+    driver: local
+  upload_data:
+    driver: local
+
+networks:
+  market-network:
+    driver: bridge

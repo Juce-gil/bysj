@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(docker --version)",
+      "Bash(bash -n deploy.sh)"
+    ]
+  }
+}

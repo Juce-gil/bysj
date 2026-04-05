@@ -4,6 +4,42 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  servlet:
+    multipart:
+      location: /app/upload
 
 market:
   storage-mode: mysql
+  upload:
+    base-dir: /app/upload
+  cors:
+    allowed-origin-patterns: "*"
+  jwt:
+    secret: ${JWT_SECRET:your-production-jwt-secret-key-2025}
+    expire-hours: 24
+    token-header: Authorization
+    token-prefix: "Bearer "
+
+logging:
+  level:
+    com.kecheng.market: INFO
+    org.springframework.web: INFO
+  file:
+    name: /app/logs/application.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
