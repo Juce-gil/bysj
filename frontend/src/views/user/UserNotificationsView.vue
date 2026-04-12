@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="notifications-page">
     <section class="grid-cards grid-cards--4">
       <article v-for="item in stats" :key="item.label" class="stat-card qh-panel">
@@ -8,19 +8,37 @@
       </article>
     </section>
 
-    <SectionCard title="站内通知" subtitle="支持按状态与类型筛选，并根据通知类型跳转到商品详情、公告详情或预约列表。">
+    <SectionCard title="我的通知" subtitle="集中查看交易提醒、公告动态与系统消息，并支持在用户中心内快速联动跳转。">
       <template #extra>
         <div class="toolbar">
-          <el-select v-model="typeFilter" placeholder="全部类型" class="toolbar-select">
+          <el-select v-model="typeFilter" placeholder="消息类型" class="toolbar-select">
             <el-option label="全部类型" value="" />
-            <el-option label="交易提醒" value="trade" />
-            <el-option label="公告通知" value="announcement" />
-            <el-option label="系统通知" value="system" />
+            <el-option label="交易消息" value="trade" />
+            <el-option label="公告消息" value="announcement" />
+            <el-option label="系统消息" value="system" />
           </el-select>
           <el-switch v-model="unreadOnly" inline-prompt active-text="仅未读" inactive-text="全部" />
           <el-button text :loading="loading" @click="loadNotifications">刷新</el-button>
         </div>
       </template>
+
+      <div class="notifications-summary qh-panel--subtle">
+        <article>
+          <span>当前筛选</span>
+          <strong>{{ currentFilterSummary }}</strong>
+          <p>可按消息类型与已读状态快速定位内容</p>
+        </article>
+        <article>
+          <span>未读消息</span>
+          <strong>{{ unreadCount }}</strong>
+          <p>优先处理交易相关或待确认提醒</p>
+        </article>
+        <article>
+          <span>展示结果</span>
+          <strong>{{ filteredNotifications.length }}</strong>
+          <p>{{ notifications.length ? '当前列表已接入真实通知接口' : '暂时还没有收到新的通知' }}</p>
+        </article>
+      </div>
 
       <el-skeleton v-if="loading && !notifications.length && !errorMessage" :rows="8" animated />
       <div v-else-if="errorMessage" class="state-panel qh-panel--subtle">
@@ -64,14 +82,14 @@
             >
               {{ getNotificationActionLabel(item.type) }}
             </el-button>
-            <span v-else class="subtle-text">当前通知仅支持站内查看与已读管理</span>
+            <span v-else class="subtle-text">该通知当前没有可跳转的详情页面</span>
           </div>
         </article>
       </div>
       <EmptyHint
         v-else
-        :title="notifications.length ? '没有符合条件的通知' : '暂无站内通知'"
-        :description="notifications.length ? '可以切换类型或已读筛选后重试。' : '后续收藏、评论、预约和公告提醒都会汇总到这里。'"
+        :title="notifications.length ? '没有符合条件的通知' : '暂时没有通知消息'"
+        :description="notifications.length ? '可以切换筛选条件，查看其它类型或已读状态的消息。' : '新的交易提醒、公告或系统消息到来后，会第一时间汇总到这里。'"
       />
     </SectionCard>
   </div>
@@ -84,7 +102,12 @@ import { useRouter } from 'vue-router';
 import SectionCard from '@/components/SectionCard.vue';
 import EmptyHint from '@/components/EmptyHint.vue';
 import { getNotifications, getUnreadNotificationCount, markNotificationRead, type NotificationItem } from '@/api/marketplace';
-import { getNotificationActionLabel, getNotificationTypeMeta, isTradeNotification, resolveNotificationTarget } from '@/utils/notification';
+import {
+  getNotificationActionLabel,
+  getNotificationTypeMeta,
+  isTradeNotification,
+  resolveNotificationTarget,
+} from '@/utils/notification';
 
 const router = useRouter();
 const notifications = ref<NotificationItem[]>([]);
@@ -99,32 +122,43 @@ const stats = computed(() => {
   const announcementCount = notifications.value.filter((item) => item.type === 'announcement').length;
   const tradeCount = notifications.value.filter((item) => isTradeNotification(item.type)).length;
   return [
-    { label: '通知总数', value: String(notifications.value.length).padStart(2, '0'), tip: '当前账号下全部站内通知数量' },
-    { label: '未读通知', value: String(unreadCount.value).padStart(2, '0'), tip: '支持进入详情后自动标记已读' },
-    { label: '交易提醒', value: String(tradeCount).padStart(2, '0'), tip: '收藏、评论与预约动态都会归档在这里' },
-    { label: '公告通知', value: String(announcementCount).padStart(2, '0'), tip: '可直接跳转到公告详情页查看' },
+    { label: '通知总数', value: String(notifications.value.length).padStart(2, '0'), tip: '展示当前所有通知消息' },
+    { label: '未读消息', value: String(unreadCount.value).padStart(2, '0'), tip: '帮助你快速跟进待处理内容' },
+    { label: '交易提醒', value: String(tradeCount).padStart(2, '0'), tip: '通常关联预约、商品或求购流程' },
+    { label: '公告动态', value: String(announcementCount).padStart(2, '0'), tip: '便于及时查看平台公告' },
   ];
 });
 
-const filteredNotifications = computed(() => notifications.value.filter((item) => {
-  if (unreadOnly.value && item.isRead) {
-    return false;
-  }
+const filteredNotifications = computed(() =>
+  notifications.value.filter((item) => {
+    if (unreadOnly.value && item.isRead) {
+      return false;
+    }
 
-  if (typeFilter.value === 'trade') {
-    return isTradeNotification(item.type);
-  }
+    if (typeFilter.value === 'trade') {
+      return isTradeNotification(item.type);
+    }
 
-  if (typeFilter.value === 'announcement') {
-    return item.type === 'announcement';
-  }
+    if (typeFilter.value === 'announcement') {
+      return item.type === 'announcement';
+    }
 
-  if (typeFilter.value === 'system') {
-    return !isTradeNotification(item.type) && item.type !== 'announcement';
-  }
+    if (typeFilter.value === 'system') {
+      return !isTradeNotification(item.type) && item.type !== 'announcement';
+    }
 
-  return true;
-}));
+    return true;
+  }),
+);
+
+const currentFilterSummary = computed(() => {
+  const parts: string[] = [];
+  if (typeFilter.value === 'trade') parts.push('交易消息');
+  if (typeFilter.value === 'announcement') parts.push('公告消息');
+  if (typeFilter.value === 'system') parts.push('系统消息');
+  if (unreadOnly.value) parts.push('仅未读');
+  return parts.join(' · ') || '显示全部通知';
+});
 
 const isPending = (id: number) => pendingIds.value.includes(id);
 
@@ -164,7 +198,7 @@ const handleMarkRead = async (item: NotificationItem) => {
 const handleOpenNotification = async (item: NotificationItem) => {
   const target = resolveNotificationTarget(item.type, item.relatedId);
   if (!target) {
-    ElMessage.info('该通知暂无可跳转的页面');
+    ElMessage.info('当前通知暂时没有可跳转的目标页面');
     return;
   }
 
@@ -182,17 +216,14 @@ const loadNotifications = async () => {
   errorMessage.value = '';
 
   try {
-    const [list, unread] = await Promise.all([
-      getNotifications(),
-      getUnreadNotificationCount(),
-    ]);
+    const [list, unread] = await Promise.all([getNotifications(), getUnreadNotificationCount()]);
     notifications.value = list;
     unreadCount.value = unread;
   } catch (error) {
     console.error('加载通知列表失败', error);
     notifications.value = [];
     unreadCount.value = 0;
-    errorMessage.value = '站内通知接口暂时不可用，请稍后刷新重试。';
+    errorMessage.value = '通知列表暂时不可用，请稍后重新尝试。';
   } finally {
     loading.value = false;
   }
@@ -208,6 +239,21 @@ onMounted(loadNotifications);
 .stat-card p { margin: 0; color: var(--qh-text-secondary); }
 .toolbar { display: flex; align-items: center; gap: 12px; }
 .toolbar-select { width: 180px; }
+.notifications-summary {
+  margin-bottom: 18px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.notifications-summary article {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+.notifications-summary span { display: block; color: var(--qh-text-secondary); }
+.notifications-summary strong { display: block; margin-top: 10px; color: var(--qh-text-primary); font-size: 22px; }
+.notifications-summary p { margin: 10px 0 0; color: var(--qh-text-secondary); line-height: 1.7; }
 .notification-list { display: grid; gap: 16px; }
 .notification-card { padding: 18px; }
 .notification-card__head,
@@ -220,6 +266,10 @@ onMounted(loadNotifications);
 .notification-card__content { margin: 14px 0 0; color: var(--qh-text-secondary); line-height: 1.8; }
 .notification-card__actions { margin-top: 16px; flex-wrap: wrap; }
 .state-panel { padding: 12px; }
+
+@media (max-width: 1100px) {
+  .notifications-summary { grid-template-columns: 1fr; }
+}
 
 @media (max-width: 960px) {
   .toolbar { width: 100%; flex-wrap: wrap; justify-content: flex-end; }

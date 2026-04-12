@@ -16,6 +16,24 @@
         </div>
       </template>
 
+      <div class="favorites-summary qh-panel--subtle">
+        <article>
+          <span>筛选结果</span>
+          <strong>{{ filteredFavorites.length }}</strong>
+          <p>{{ keyword ? `当前关键词：${keyword}` : '当前显示全部收藏商品' }}</p>
+        </article>
+        <article>
+          <span>在售状态</span>
+          <strong>{{ onSaleCount }}</strong>
+          <p>可继续发起预约或查看详情</p>
+        </article>
+        <article>
+          <span>收藏建议</span>
+          <strong>{{ favorites.length ? '持续关注' : '去逛逛' }}</strong>
+          <p>收藏商品后可在这里快速回访、比较与取消收藏</p>
+        </article>
+      </div>
+
       <el-skeleton v-if="loading" :rows="8" animated />
       <div v-else-if="errorMessage" class="state-panel qh-panel--subtle">
         <el-result icon="warning" title="收藏列表加载失败" :sub-title="errorMessage">
@@ -26,23 +44,31 @@
       </div>
       <div v-else-if="filteredFavorites.length" class="favorites-grid">
         <article v-for="item in filteredFavorites" :key="item.id" class="favorite-card qh-panel--subtle">
-          <div class="mock-cover favorite-card__cover" :style="{ background: getGoodsCardBackground(item) }">{{ item.title.slice(0, 2) }}</div>
+          <div class="mock-cover favorite-card__cover" :style="{ background: getGoodsCardBackground(item) }">
+            {{ item.title.slice(0, 2) }}
+          </div>
           <div class="favorite-card__body">
             <div class="favorite-card__head">
-              <h3>{{ item.title }}</h3>
-              <el-tag size="small" effect="light" :type="getGoodsStatusMeta(item.status).type">{{ getGoodsStatusMeta(item.status).text }}</el-tag>
+              <div>
+                <h3>{{ item.title }}</h3>
+                <div class="card-meta">
+                  <span>{{ item.category }}</span>
+                  <span>{{ item.campus }}</span>
+                  <span>{{ item.condition }}</span>
+                </div>
+              </div>
+              <el-tag size="small" effect="light" :type="getGoodsStatusMeta(item.status).type">
+                {{ getGoodsStatusMeta(item.status).text }}
+              </el-tag>
             </div>
             <p>{{ item.intro }}</p>
-            <div class="card-meta">
-              <span>{{ item.category }}</span>
-              <span>{{ item.campus }}</span>
-              <span>{{ item.condition }}</span>
-            </div>
             <div class="favorite-card__bottom">
               <span class="price-text">{{ formatPrice(item.price) }}</span>
               <div class="actions">
                 <RouterLink :to="`/goods/${item.id}`">查看详情</RouterLink>
-                <el-button link type="primary" :loading="isPending(item.id)" @click="removeFavorite(item)">取消收藏</el-button>
+                <el-button link type="primary" :loading="isPending(item.id)" @click="removeFavorite(item)">
+                  取消收藏
+                </el-button>
               </div>
             </div>
           </div>
@@ -52,7 +78,12 @@
         v-else
         :title="favorites.length ? '没有匹配的收藏商品' : '你还没有收藏商品'"
         :description="favorites.length ? '可以换个关键词再试，或者清空搜索条件。' : '去商品详情页点一下收藏，喜欢的物品就会汇总到这里。'"
-      />
+      >
+        <template #actions>
+          <RouterLink class="empty-link" to="/goods">去逛商品广场</RouterLink>
+          <el-button v-if="keyword" @click="keyword = ''">清空关键词</el-button>
+        </template>
+      </EmptyHint>
     </SectionCard>
   </div>
 </template>
@@ -74,21 +105,25 @@ const errorMessage = ref('');
 const keyword = ref('');
 const pendingIds = ref<number[]>([]);
 
-const stats = computed(() => {
-  const total = favorites.value.length;
-  const onSale = favorites.value.filter((item) => item.status === 'on_sale').length;
-  const reserved = favorites.value.filter((item) => item.status === 'reserved').length;
-  const sold = favorites.value.filter((item) => item.status === 'sold').length;
-  return [
-    { label: '收藏总数', value: String(total).padStart(2, '0'), tip: '已接入真实收藏列表' },
-    { label: '在售商品', value: String(onSale).padStart(2, '0'), tip: '可继续发起预约或评论' },
-    { label: '已预约', value: String(reserved).padStart(2, '0'), tip: '说明卖家已收到预约意向' },
-    { label: '已售出', value: String(sold).padStart(2, '0'), tip: '仍可作为历史收藏留档' },
-  ];
-});
+const totalCount = computed(() => favorites.value.length);
+const onSaleCount = computed(() => favorites.value.filter((item) => item.status === 'on_sale').length);
+const reservedCount = computed(() => favorites.value.filter((item) => item.status === 'reserved').length);
+const soldCount = computed(() => favorites.value.filter((item) => item.status === 'sold').length);
 
-const filteredFavorites = computed(() => favorites.value.filter((item) => `${item.title}${item.intro}${item.description}`.toLowerCase().includes(keyword.value.toLowerCase())));
-const getGoodsCardBackground = (item: GoodsItem) => buildCoverBackground(item.coverStyle, item.coverImageUrl || item.imageUrls[0]);
+const stats = computed(() => [
+  { label: '收藏总数', value: String(totalCount.value).padStart(2, '0'), tip: '已接入真实收藏列表' },
+  { label: '在售商品', value: String(onSaleCount.value).padStart(2, '0'), tip: '可继续发起预约或评论' },
+  { label: '已预约', value: String(reservedCount.value).padStart(2, '0'), tip: '说明卖家已收到预约意向' },
+  { label: '已售出', value: String(soldCount.value).padStart(2, '0'), tip: '仍可作为历史收藏留档' },
+]);
+
+const filteredFavorites = computed(() =>
+  favorites.value.filter((item) =>
+    `${item.title}${item.intro}${item.description}`.toLowerCase().includes(keyword.value.toLowerCase()),
+  ),
+);
+const getGoodsCardBackground = (item: GoodsItem) =>
+  buildCoverBackground(item.coverStyle, item.coverImageUrl || item.imageUrls[0]);
 const isPending = (id: number) => pendingIds.value.includes(id);
 
 const loadFavorites = async () => {
@@ -135,16 +170,53 @@ onMounted(loadFavorites);
 .stat-card p { margin: 0; color: var(--qh-text-secondary); }
 .toolbar { display: flex; gap: 12px; align-items: center; }
 .toolbar-input { width: 260px; }
+
+.favorites-summary {
+  margin-bottom: 18px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.favorites-summary article {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+}
+.favorites-summary span {
+  display: block;
+  color: var(--qh-text-secondary);
+}
+.favorites-summary strong {
+  display: block;
+  margin-top: 10px;
+  color: var(--qh-text-primary);
+  font-size: 22px;
+}
+.favorites-summary p {
+  margin: 10px 0 0;
+  line-height: 1.7;
+  color: var(--qh-text-secondary);
+}
+
 .favorites-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.favorite-card { overflow: hidden; }
+.favorite-card { overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.favorite-card:hover { transform: translateY(-2px); }
 .favorite-card__cover { min-height: 180px; }
 .favorite-card__body { padding: 18px; }
 .favorite-card__head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.favorite-card__head h3 { margin: 0; color: var(--qh-text-primary); }
+.favorite-card__head h3 { margin: 0 0 10px; color: var(--qh-text-primary); }
 .favorite-card p { margin: 14px 0; line-height: 1.8; color: var(--qh-text-secondary); }
 .favorite-card__bottom { margin-top: 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.actions { display: flex; gap: 12px; align-items: center; }
+.actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.actions a,
+.empty-link { color: var(--qh-primary-deep); text-decoration: none; font-weight: 600; }
 .state-panel { padding: 12px; }
+
+@media (max-width: 1100px) {
+  .favorites-summary { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 960px) {
   .toolbar { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
   .toolbar-input,

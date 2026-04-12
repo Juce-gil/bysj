@@ -3,7 +3,13 @@
     "allow": [
       "Bash(xargs grep:*)",
       "Bash(docker --version)",
-      "Bash(bash -n deploy.sh)"
+      "Bash(bash -n deploy.sh)",
+      "Bash(sshpass -p 'Wjh103876' ssh -o StrictHostKeyChecking=no root@39.104.93.85 \"echo 'Connected successfully'\")",
+      "Bash(pip --version)",
+      "Bash(python -c \"import paramiko; print\\('paramiko available'\\)\")",
+      "Bash(python -m pip --version)",
+      "Bash(plink -version)",
+      "Bash(powershell -Command \"Write-Host 'PowerShell available'\")"
     ]
   }
 }

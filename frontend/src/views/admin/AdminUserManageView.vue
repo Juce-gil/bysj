@@ -9,13 +9,31 @@
     </section>
 
     <section class="page-section">
-      <SectionCard title="查询筛选" subtitle="已接入真实管理员用户分页接口，支持关键词、角色、状态与分页联调。">
+      <SectionCard title="筛选用户" subtitle="按关键词、角色与状态快速定位平台账号">
+        <div class="filter-overview qh-panel--subtle">
+          <article>
+            <span>用户总数</span>
+            <strong>{{ String(pagination.total).padStart(2, '0') }}</strong>
+            <p>当前筛选范围内的账号量</p>
+          </article>
+          <article>
+            <span>筛选条件</span>
+            <strong>{{ currentFilterSummary }}</strong>
+            <p>支持关键词、角色与状态组合检索</p>
+          </article>
+          <article>
+            <span>账号状态</span>
+            <strong>启用 {{ activeCount }}</strong>
+            <p>禁用 {{ disabledCount }} · 管理员 {{ adminCount }}</p>
+          </article>
+        </div>
+
         <el-form :inline="true" class="filter-form" @submit.prevent>
           <el-form-item label="关键词" class="filter-form__item filter-form__item--keyword">
             <el-input
               v-model="filters.keyword"
               clearable
-              placeholder="搜索用户名、昵称、学号或手机号"
+              placeholder="搜索昵称、账号或学号"
               @keyup.enter="handleSearch"
             />
           </el-form-item>
@@ -38,35 +56,50 @@
     </section>
 
     <section class="page-section">
-      <SectionCard title="用户列表" subtitle="支持管理员查看用户资料、注册时间，并执行禁用或恢复操作。">
+      <SectionCard title="用户列表" subtitle="支持分页查看用户信息并执行启停用操作">
         <template #extra>
           <el-button text :loading="loading" @click="loadUsers">刷新</el-button>
         </template>
+
+        <div class="table-headline qh-panel--subtle">
+          <div>
+            <strong>账号列表</strong>
+            <p>{{ listSummary }}</p>
+          </div>
+          <div class="table-headline__chips">
+            <span class="info-chip">当前 {{ tableData.length }} 条</span>
+            <span class="info-chip">每页 {{ pagination.pageSize }} 条</span>
+            <span v-if="hasFilters" class="info-chip info-chip--dark">已启用筛选</span>
+          </div>
+        </div>
 
         <el-alert
           type="info"
           show-icon
           :closable="false"
-          title="当前页面已接入 GET /api/admin/users 与 PUT /api/admin/users/{id}/status；为避免误操作，管理员账号不显示禁用按钮。"
+          title="接口已联调：GET /api/admin/users 与 PUT /api/admin/users/{id}/status，可直接完成用户状态管理。"
         />
 
         <el-skeleton v-if="loading && !tableData.length && !errorMessage" :rows="8" animated class="table-skeleton" />
         <div v-else-if="errorMessage" class="state-panel qh-panel--subtle">
-          <el-result icon="warning" title="用户列表加载失败" :sub-title="errorMessage">
+          <el-result icon="warning" title="加载失败" :sub-title="errorMessage">
             <template #extra>
-              <el-button type="primary" @click="loadUsers">重新加载</el-button>
+              <el-button type="primary" @click="loadUsers">重新获取</el-button>
             </template>
           </el-result>
         </div>
         <template v-else-if="tableData.length">
           <div v-loading="loading" class="table-wrapper">
             <el-table :data="tableData" row-key="id" stripe class="user-table">
-              <el-table-column label="用户信息" min-width="260">
+              <el-table-column label="用户信息" min-width="300">
                 <template #default="scope">
                   <div class="user-cell">
-                    <strong>{{ scope.row.displayName }}</strong>
-                    <span>@{{ scope.row.username }}</span>
-                    <p>{{ scope.row.school || '科成' }}</p>
+                    <div class="user-avatar">{{ getDisplayInitial(scope.row.displayName) }}</div>
+                    <div class="user-cell__content">
+                      <strong>{{ scope.row.displayName }}</strong>
+                      <span>@{{ scope.row.username }}</span>
+                      <p>{{ scope.row.school || '未知' }}</p>
+                    </div>
                   </div>
                 </template>
               </el-table-column>
@@ -125,7 +158,7 @@
         <div v-else class="empty-wrapper">
           <EmptyHint
             title="暂无用户数据"
-            :description="hasFilters ? '当前筛选条件下没有匹配用户，请调整搜索条件后重试。' : '当前还没有可展示的用户数据。'"
+            :description="hasFilters ? '未找到符合当前筛选条件的用户' : '当前还没有可展示的用户数据'"
           />
         </div>
       </SectionCard>
@@ -151,8 +184,8 @@ type StatusFilterValue = '' | 'active' | 'disabled';
 
 const statusOptions: Array<{ label: string; value: StatusFilterValue }> = [
   { label: '全部状态', value: '' },
-  { label: '正常', value: 'active' },
-  { label: '已禁用', value: 'disabled' },
+  { label: '启用', value: 'active' },
+  { label: '禁用', value: 'disabled' },
 ];
 
 const pageSizeOptions = [10, 20, 50];
@@ -176,11 +209,23 @@ const adminCount = computed(() => tableData.value.filter((item) => isAdminRole(i
 const disabledCount = computed(() => tableData.value.filter((item) => item.disabled).length);
 const activeCount = computed(() => tableData.value.filter((item) => !item.disabled).length);
 const stats = computed(() => [
-  { label: '筛选结果', value: String(pagination.total).padStart(2, '0'), tip: '来自后台真实分页总数' },
-  { label: '当前页条数', value: String(tableData.value.length).padStart(2, '0'), tip: '本页已加载的用户数量' },
-  { label: '本页管理员', value: String(adminCount.value).padStart(2, '0'), tip: '管理员账号默认不提供禁用按钮' },
-  { label: '正常用户', value: String(activeCount.value).padStart(2, '0'), tip: `当前页已禁用 ${String(disabledCount.value).padStart(2, '0')} 人` },
+  { label: '用户总数', value: String(pagination.total).padStart(2, '0'), tip: '当前筛选后的总用户数' },
+  { label: '本页数量', value: String(tableData.value.length).padStart(2, '0'), tip: '当前页展示的账号数量' },
+  { label: '管理员', value: String(adminCount.value).padStart(2, '0'), tip: '当前页中的管理员账号数' },
+  { label: '启用中', value: String(activeCount.value).padStart(2, '0'), tip: `禁用用户 ${String(disabledCount.value).padStart(2, '0')} 人` },
 ]);
+
+const currentFilterSummary = computed(() => {
+  const parts: string[] = [];
+  if (filters.keyword.trim()) parts.push(`关键词“${filters.keyword.trim()}”`);
+  if (filters.role) parts.push(`角色 ${filters.role === 'admin' ? '管理员' : '普通用户'}`);
+  if (filters.status) parts.push(`状态 ${filters.status === 'active' ? '启用' : '禁用'}`);
+  return parts.join(' · ') || '全部用户';
+});
+
+const listSummary = computed(() => (hasFilters.value
+  ? `当前按 ${currentFilterSummary.value} 共筛选到 ${pagination.total} 位用户`
+  : `当前共有 ${pagination.total} 位用户，支持按关键词、角色和状态快速检索`));
 
 const resolveDisabledParam = (status: StatusFilterValue) => {
   if (status === 'disabled') {
@@ -202,11 +247,12 @@ const getRoleMeta = (role: string) => {
 };
 
 const getStatusMeta = (disabled: boolean) => (disabled
-  ? { text: '已禁用', type: 'danger' as const }
-  : { text: '正常', type: 'success' as const });
+  ? { text: '禁用', type: 'danger' as const }
+  : { text: '启用', type: 'success' as const });
 
-const displayValue = (value: string) => value || '—';
-const formatRegisterTime = (value: string) => value ? formatDate(value) : '暂无';
+const displayValue = (value: string) => value || '-';
+const formatRegisterTime = (value: string) => (value ? formatDate(value) : '未知');
+const getDisplayInitial = (value: string) => (value?.trim()?.charAt(0) || '?').toUpperCase();
 
 const loadUsers = async () => {
   loading.value = true;
@@ -226,10 +272,10 @@ const loadUsers = async () => {
     pagination.pageNum = page.pageNum;
     pagination.pageSize = page.pageSize;
   } catch (error) {
-    console.error('加载管理员用户列表失败', error);
+    console.error('管理员用户列表加载失败', error);
     tableData.value = [];
     pagination.total = 0;
-    errorMessage.value = '管理员用户接口暂时不可用，请确认已使用管理员账号登录并稍后重试。';
+    errorMessage.value = '用户列表加载失败，请稍后重试。';
   } finally {
     loading.value = false;
   }
@@ -263,20 +309,24 @@ const handleToggleStatus = async (item: AdminUserItem) => {
   const nextDisabled = !item.disabled;
   const actionText = nextDisabled ? '禁用' : '恢复';
 
-  await ElMessageBox.confirm(
-    `确认要${actionText}用户“${item.displayName}”吗？`,
-    `${actionText}确认`,
-    {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-    },
-  );
+  try {
+    await ElMessageBox.confirm(
+      `确认${actionText}用户“${item.displayName}”吗？`,
+      `${actionText}用户`,
+      {
+        type: 'warning',
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+      },
+    );
+  } catch {
+    return;
+  }
 
   pendingUserIds.value = [...pendingUserIds.value, item.id];
   try {
     await updateAdminUserStatus(item.id, nextDisabled);
-    ElMessage.success(`已${actionText}用户`);
+    ElMessage.success(`${actionText}成功`);
     await loadUsers();
   } catch (error) {
     console.error(`${actionText}用户失败`, error);
@@ -289,34 +339,221 @@ onMounted(loadUsers);
 </script>
 
 <style scoped lang="scss">
-.stat-card { padding: 22px; }
-.stat-card span { color: var(--qh-text-secondary); }
-.stat-card strong { display: block; margin: 14px 0 10px; font-size: 30px; color: var(--qh-primary-deep); }
-.stat-card p { margin: 0; color: var(--qh-text-secondary); }
-.filter-form { display: grid; grid-template-columns: minmax(0, 1.8fr) 180px 180px auto; gap: 16px; align-items: end; }
-.filter-form :deep(.el-form-item) { margin-bottom: 0; }
-.filter-form__item { min-width: 0; }
+.stat-card {
+  padding: 22px;
+}
+
+.stat-card span {
+  color: var(--qh-text-secondary);
+}
+
+.stat-card strong {
+  display: block;
+  margin: 14px 0 10px;
+  font-size: 30px;
+  color: var(--qh-primary-deep);
+}
+
+.stat-card p {
+  margin: 0;
+  color: var(--qh-text-secondary);
+}
+
+.filter-overview {
+  margin-bottom: 18px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.filter-overview article {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.filter-overview span {
+  display: block;
+  color: var(--qh-text-secondary);
+}
+
+.filter-overview strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 20px;
+  color: var(--qh-text-primary);
+  line-height: 1.5;
+}
+
+.filter-overview p {
+  margin: 8px 0 0;
+  line-height: 1.7;
+  color: var(--qh-text-secondary);
+}
+
+.filter-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) 180px 180px auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.filter-form__item {
+  min-width: 0;
+}
+
 .filter-form__item :deep(.el-input),
-.filter-form__item :deep(.el-select) { width: 100%; }
-.filter-actions { display: flex; justify-content: flex-end; gap: 12px; }
-.table-skeleton { margin-top: 18px; }
-.state-panel { margin-top: 18px; padding: 12px; }
-.table-wrapper { margin-top: 18px; }
-.user-cell { display: grid; gap: 6px; }
-.user-cell strong { color: var(--qh-text-primary); line-height: 1.5; }
-.user-cell span { color: var(--qh-primary-deep); font-size: 13px; }
-.user-cell p { margin: 0; color: var(--qh-text-secondary); line-height: 1.6; }
-.pagination-bar { margin-top: 20px; display: flex; justify-content: flex-end; }
-.empty-wrapper { margin-top: 18px; }
+.filter-form__item :deep(.el-select) {
+  width: 100%;
+}
+
+.filter-actions,
+.table-headline__chips {
+  display: flex;
+  gap: 12px;
+}
+
+.filter-actions {
+  justify-content: flex-end;
+}
+
+.table-headline {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.table-headline strong {
+  color: var(--qh-text-primary);
+}
+
+.table-headline p {
+  margin: 8px 0 0;
+  color: var(--qh-text-secondary);
+  line-height: 1.8;
+}
+
+.info-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--qh-text-primary);
+  font-weight: 600;
+}
+
+.info-chip--dark {
+  background: rgba(32, 39, 51, 0.94);
+  color: #ffe27a;
+}
+
+.table-skeleton {
+  margin-top: 18px;
+}
+
+.state-panel {
+  margin-top: 18px;
+  padding: 12px;
+}
+
+.table-wrapper {
+  margin-top: 18px;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.user-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(255, 221, 119, 0.95), rgba(255, 248, 209, 0.95));
+  color: var(--qh-text-primary);
+  font-weight: 800;
+}
+
+.user-cell__content {
+  display: grid;
+  gap: 6px;
+}
+
+.user-cell strong {
+  color: var(--qh-text-primary);
+  line-height: 1.5;
+}
+
+.user-cell span {
+  color: var(--qh-primary-deep);
+  font-size: 13px;
+}
+
+.user-cell p {
+  margin: 0;
+  color: var(--qh-text-secondary);
+  line-height: 1.6;
+}
+
+.pagination-bar {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.empty-wrapper {
+  margin-top: 18px;
+}
 
 @media (max-width: 1200px) {
-  .filter-form { grid-template-columns: minmax(0, 1fr) 180px 180px; }
-  .filter-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .filter-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-form {
+    grid-template-columns: minmax(0, 1fr) 180px 180px;
+  }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .table-headline {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 768px) {
-  .filter-form { grid-template-columns: 1fr; }
-  .filter-actions { justify-content: flex-start; }
-  .pagination-bar { justify-content: flex-start; overflow-x: auto; }
+  .filter-form {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    justify-content: flex-start;
+  }
+
+  .pagination-bar {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .table-headline__chips {
+    flex-wrap: wrap;
+  }
 }
 </style>

@@ -1,0 +1,43 @@
+# 在服务器上执行的命令（逐行执行）
+
+# 1. 备份当前Docker配置
+cp /etc/docker/daemon.json /etc/docker/daemon.json.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+
+# 2. 创建新的可靠镜像源配置
+cat > /etc/docker/daemon.json << 'EOF'
+{
+  "debug": true,
+  "experimental": false,
+  "registry-mirrors": [
+    "https://docker.1ms.run",
+    "https://docker.m.daocloud.io",
+    "https://lispy.org",
+    "https://docker-0.unsee.tech"
+  ]
+}
+EOF
+
+# 3. 重启Docker服务
+systemctl restart docker
+
+# 4. 等待重启完成
+sleep 3
+
+# 5. 测试镜像拉取
+docker pull alpine:latest
+
+# 6. 测试拉取项目需要的镜像
+docker pull maven:3.9.9-eclipse-temurin-17
+
+# 7. 重新构建项目（在/opt/campus-market目录下）
+cd /opt/campus-market
+docker-compose build --no-cache
+
+# 8. 启动服务
+docker-compose up -d
+
+# 9. 检查服务状态
+docker-compose ps
+
+# 10. 查看日志
+docker-compose logs --tail=50

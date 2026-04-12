@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="admin-announcement-page">
     <section class="grid-cards grid-cards--4">
       <article v-for="item in stats" :key="item.label" class="stat-card qh-panel">
@@ -9,13 +9,31 @@
     </section>
 
     <section class="page-section">
-      <SectionCard title="查询筛选" subtitle="支持按关键字和发布状态检索，列表数据来自管理员公告真实接口。">
+      <SectionCard title="筛选公告" subtitle="按标题关键词与发布状态快速定位公告内容">
+        <div class="filter-overview qh-panel--subtle">
+          <article>
+            <span>公告总数</span>
+            <strong>{{ String(pagination.total).padStart(2, '0') }}</strong>
+            <p>当前筛选范围内的公告数量</p>
+          </article>
+          <article>
+            <span>筛选条件</span>
+            <strong>{{ currentFilterSummary }}</strong>
+            <p>支持标题关键词与发布状态组合检索</p>
+          </article>
+          <article>
+            <span>发布概况</span>
+            <strong>已发布 {{ publishedCount }}</strong>
+            <p>未发布 {{ unpublishedCount }} · 置顶 {{ topCount }}</p>
+          </article>
+        </div>
+
         <el-form :inline="true" class="filter-form" @submit.prevent>
-          <el-form-item label="关键字" class="filter-form__item filter-form__item--keyword">
+          <el-form-item label="关键词" class="filter-form__item filter-form__item--keyword">
             <el-input
               v-model="filters.keyword"
               clearable
-              placeholder="搜索公告标题、摘要或正文关键字"
+              placeholder="搜索公告标题关键词"
               @keyup.enter="handleSearch"
             />
           </el-form-item>
@@ -33,24 +51,36 @@
     </section>
 
     <section class="page-section">
-      <SectionCard title="公告列表" subtitle="支持查看详情、新增、编辑、发布、下线和删除，操作完成后自动刷新列表。">
+      <SectionCard title="公告列表" subtitle="支持查看详情、编辑内容、发布下线与删除操作">
         <template #extra>
           <div class="card-actions">
             <el-button text :loading="loading" @click="loadAnnouncements">刷新</el-button>
-            <el-button type="primary" @click="handleOpenCreate">新增公告</el-button>
+            <el-button type="primary" @click="handleOpenCreate">新建公告</el-button>
           </div>
         </template>
+
+        <div class="table-headline qh-panel--subtle">
+          <div>
+            <strong>公告清单</strong>
+            <p>{{ listSummary }}</p>
+          </div>
+          <div class="table-headline__chips">
+            <span class="info-chip">当前 {{ tableData.length }} 条</span>
+            <span class="info-chip">每页 {{ pagination.pageSize }} 条</span>
+            <span v-if="hasFilters" class="info-chip info-chip--dark">已启用筛选</span>
+          </div>
+        </div>
 
         <el-alert
           type="info"
           show-icon
           :closable="false"
-          title="当前页面已接入管理员公告列表、详情、新增、编辑、发布、下线与删除接口，可直接进行真联调。"
+          title="接口已联调：支持公告分页查询、详情查看、新增编辑、发布下线与删除管理。"
         />
 
         <el-skeleton v-if="loading && !tableData.length && !errorMessage" :rows="8" animated class="table-skeleton" />
         <div v-else-if="errorMessage" class="state-panel qh-panel--subtle">
-          <el-result icon="warning" title="公告列表加载失败" :sub-title="errorMessage">
+          <el-result icon="warning" title="加载失败" :sub-title="errorMessage">
             <template #extra>
               <el-button type="primary" @click="loadAnnouncements">重新加载</el-button>
             </template>
@@ -70,7 +100,7 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column prop="level" label="类型" min-width="110">
+              <el-table-column prop="level" label="级别" min-width="110">
                 <template #default="scope">
                   <el-tag effect="plain" :type="getAnnouncementLevelTagType(scope.row.level)">{{ scope.row.level }}</el-tag>
                 </template>
@@ -88,7 +118,7 @@
               <el-table-column label="操作" min-width="300" fixed="right">
                 <template #default="scope">
                   <div class="table-actions">
-                    <el-button link type="primary" @click="handleOpenDetail(scope.row)">查看</el-button>
+                    <el-button link type="primary" @click="handleOpenDetail(scope.row)">详情</el-button>
                     <el-button link @click="handleOpenEdit(scope.row)">编辑</el-button>
                     <el-button
                       link
@@ -137,8 +167,8 @@
         </template>
         <div v-else class="empty-wrapper">
           <EmptyHint
-            :title="hasFilters ? '没有符合条件的公告' : '当前暂无公告数据'"
-            :description="hasFilters ? '可以尝试清空关键字或切换状态后重新查询。' : '公告列表接口暂未返回数据时，这里会展示统一空态。'"
+            :title="hasFilters ? '未找到匹配公告' : '暂无公告数据'"
+            :description="hasFilters ? '请尝试调整关键词或发布状态后重试' : '当前还没有可展示的公告内容'"
           />
         </div>
       </SectionCard>
@@ -156,7 +186,16 @@
               <el-tag v-if="detailData.top" effect="light" type="danger">置顶</el-tag>
             </div>
             <h2>{{ detailData.title }}</h2>
-            <p class="detail-time">发布时间：{{ formatPublishTime(detailData.publishedAt) }}</p>
+            <div class="detail-summary qh-panel--subtle">
+              <article>
+                <span>发布时间</span>
+                <strong>{{ formatPublishTime(detailData.publishedAt) }}</strong>
+              </article>
+              <article>
+                <span>发布状态</span>
+                <strong>{{ getPublishStatusMeta(detailData.published).text }}</strong>
+              </article>
+            </div>
           </div>
           <div class="detail-section">
             <span class="detail-section__label">摘要</span>
@@ -167,8 +206,8 @@
             <div class="detail-content qh-panel--subtle">{{ detailData.content || '暂无正文内容' }}</div>
           </div>
         </template>
-        <el-empty v-else-if="detailErrorMessage" description="公告详情加载失败，请稍后重试。">
-          <el-button type="primary" @click="retryLoadDetail">重新加载</el-button>
+        <el-empty v-else-if="detailErrorMessage" description="公告详情加载失败">
+          <el-button type="primary" @click="retryLoadDetail">重新获取</el-button>
         </el-empty>
       </div>
     </el-drawer>
@@ -181,6 +220,11 @@
       :close-on-click-modal="false"
     >
       <div v-loading="dialogLoading" class="form-panel">
+        <div class="form-tips qh-panel--subtle">
+          <strong>编辑提示</strong>
+          <p>公告支持标题、摘要、级别、正文、置顶和发布状态管理，保存后会同步刷新列表。</p>
+        </div>
+
         <el-form ref="formRef" :model="formModel" :rules="formRules" label-position="top" class="announcement-form">
           <el-form-item label="公告标题" prop="title">
             <el-input v-model="formModel.title" maxlength="100" show-word-limit placeholder="请输入公告标题" />
@@ -192,17 +236,17 @@
               :rows="3"
               maxlength="255"
               show-word-limit
-              placeholder="请输入公告摘要，可留空"
+              placeholder="请输入公告摘要"
             />
           </el-form-item>
           <div class="form-grid">
-            <el-form-item label="公告类型" prop="level">
+            <el-form-item label="公告级别" prop="level">
               <el-select
                 v-model="formModel.level"
                 filterable
                 allow-create
                 default-first-option
-                placeholder="请选择或输入公告类型"
+                placeholder="请选择或输入公告级别"
               >
                 <el-option v-for="item in levelOptions" :key="item" :label="item" :value="item" />
               </el-select>
@@ -212,14 +256,14 @@
                 <div class="switch-item">
                   <div>
                     <strong>置顶公告</strong>
-                    <p>置顶后会在前台列表中优先展示</p>
+                    <p>启用后会在列表中高亮显示该公告</p>
                   </div>
                   <el-switch v-model="formModel.top" />
                 </div>
                 <div class="switch-item">
                   <div>
                     <strong>立即发布</strong>
-                    <p>关闭时保存为未发布状态，可稍后手动发布</p>
+                    <p>启用后保存时将直接把公告发布到前台</p>
                   </div>
                   <el-switch v-model="formModel.published" />
                 </div>
@@ -331,18 +375,18 @@ const currentActionKey = ref('');
 const formRules: FormRules<AnnouncementFormModel> = {
   title: [
     { required: true, message: '请输入公告标题', trigger: 'blur' },
-    { min: 1, max: 100, message: '标题长度需在 1 到 100 个字符之间', trigger: 'blur' },
+    { min: 1, max: 100, message: '公告标题长度需在 1 到 100 个字符之间', trigger: 'blur' },
   ],
   summary: [
-    { max: 255, message: '摘要不能超过 255 个字符', trigger: 'blur' },
+    { max: 255, message: '公告摘要不能超过 255 个字符', trigger: 'blur' },
   ],
   level: [
-    { required: true, message: '请选择或输入公告类型', trigger: 'change' },
-    { min: 1, max: 30, message: '类型不能超过 30 个字符', trigger: 'change' },
+    { required: true, message: '请选择或输入公告级别', trigger: 'change' },
+    { min: 1, max: 30, message: '公告级别不能超过 30 个字符', trigger: 'change' },
   ],
   content: [
     { required: true, message: '请输入公告正文', trigger: 'blur' },
-    { min: 1, max: 10000, message: '正文长度需在 1 到 10000 个字符之间', trigger: 'blur' },
+    { min: 1, max: 10000, message: '公告正文长度需在 1 到 10000 个字符之间', trigger: 'blur' },
   ],
 };
 
@@ -351,12 +395,23 @@ const publishedCount = computed(() => tableData.value.filter((item) => item.publ
 const unpublishedCount = computed(() => tableData.value.filter((item) => !item.published).length);
 const topCount = computed(() => tableData.value.filter((item) => item.top).length);
 const stats = computed(() => [
-  { label: '筛选结果', value: String(pagination.total).padStart(2, '0'), tip: '来自后端真实分页总数' },
-  { label: '当前页条数', value: String(tableData.value.length).padStart(2, '0'), tip: '本页已加载的公告数量' },
-  { label: '本页已发布', value: String(publishedCount.value).padStart(2, '0'), tip: `未发布 ${String(unpublishedCount.value).padStart(2, '0')} 条` },
-  { label: '本页置顶', value: String(topCount.value).padStart(2, '0'), tip: '便于快速核对重点公告' },
+  { label: '公告总数', value: String(pagination.total).padStart(2, '0'), tip: '符合当前筛选条件的公告数' },
+  { label: '本页数量', value: String(tableData.value.length).padStart(2, '0'), tip: '当前页展示的公告数量' },
+  { label: '已发布', value: String(publishedCount.value).padStart(2, '0'), tip: `未发布 ${String(unpublishedCount.value).padStart(2, '0')} 条` },
+  { label: '置顶数', value: String(topCount.value).padStart(2, '0'), tip: '当前页已置顶的公告数量' },
 ]);
-const dialogTitle = computed(() => (dialogMode.value === 'create' ? '新增公告' : '编辑公告'));
+const dialogTitle = computed(() => (dialogMode.value === 'create' ? '新建公告' : '编辑公告'));
+
+const currentFilterSummary = computed(() => {
+  const parts: string[] = [];
+  if (filters.keyword.trim()) parts.push(`关键词“${filters.keyword.trim()}”`);
+  if (filters.status) parts.push(filters.status === 'published' ? '已发布' : '未发布');
+  return parts.join(' · ') || '全部公告';
+});
+
+const listSummary = computed(() => (hasFilters.value
+  ? `当前按 ${currentFilterSummary.value} 共筛选到 ${pagination.total} 条公告`
+  : `当前共有 ${pagination.total} 条公告，可执行新建、编辑、发布与删除等操作`));
 
 const resolvePublishedParam = (status: StatusFilterValue) => {
   if (status === 'published') {
@@ -396,7 +451,7 @@ const getPublishStatusMeta = (published: boolean) => (published
   ? { text: '已发布', type: 'success' as const }
   : { text: '未发布', type: 'info' as const });
 
-const formatPublishTime = (value: string) => (value ? formatDate(value) : '暂无');
+const formatPublishTime = (value: string) => (value ? formatDate(value) : '未发布');
 const getActionKey = (type: ActionType, id: number) => `${type}-${id}`;
 const isActionLoading = (type: ActionType, id: number) => currentActionKey.value === getActionKey(type, id);
 
@@ -417,10 +472,10 @@ const loadAnnouncements = async () => {
     pagination.pageNum = page.pageNum;
     pagination.pageSize = page.pageSize;
   } catch (error) {
-    console.error('加载管理员公告列表失败', error);
+    console.error('管理员公告列表加载失败', error);
     tableData.value = [];
     pagination.total = 0;
-    errorMessage.value = '管理员公告接口暂时不可用，请确认已使用管理员账号登录后重试。';
+    errorMessage.value = '公告列表加载失败，请稍后重试。';
   } finally {
     loading.value = false;
   }
@@ -434,9 +489,9 @@ const loadAnnouncementDetail = async (id: number) => {
   try {
     detailData.value = await getAdminAnnouncementDetail(id);
   } catch (error) {
-    console.error('加载公告详情失败', error);
+    console.error('公告详情加载失败', error);
     detailData.value = null;
-    detailErrorMessage.value = '公告详情加载失败';
+    detailErrorMessage.value = '公告详情获取失败';
   } finally {
     detailLoading.value = false;
   }
@@ -500,9 +555,9 @@ const handleOpenEdit = async (item: AdminAnnouncementItem) => {
     await nextTick();
     formRef.value?.clearValidate();
   } catch (error) {
-    console.error('加载公告编辑数据失败', error);
+    console.error('公告编辑数据加载失败', error);
     formVisible.value = false;
-    ElMessage.error('公告详情加载失败，暂时无法编辑。');
+    ElMessage.error('公告详情加载失败，暂时无法编辑');
   } finally {
     dialogLoading.value = false;
   }
@@ -529,7 +584,7 @@ const handleSubmitForm = async () => {
       : await updateAdminAnnouncement(editingId.value as number, payload);
 
     syncDetailIfMatched(result);
-    ElMessage.success(dialogMode.value === 'create' ? '公告新增成功' : '公告更新成功');
+    ElMessage.success(dialogMode.value === 'create' ? '公告创建成功' : '公告更新成功');
     formVisible.value = false;
     await loadAnnouncements();
   } catch (error) {
@@ -541,7 +596,7 @@ const handleSubmitForm = async () => {
 
 const handlePublish = async (item: AdminAnnouncementItem) => {
   try {
-    await ElMessageBox.confirm(`确认发布公告《${item.title}》吗？`, '发布确认', {
+    await ElMessageBox.confirm(`确认发布公告“${item.title}”吗？`, '发布公告', {
       type: 'warning',
       confirmButtonText: '确认发布',
       cancelButtonText: '取消',
@@ -554,7 +609,7 @@ const handlePublish = async (item: AdminAnnouncementItem) => {
   try {
     const detail = await publishAdminAnnouncement(item.id);
     syncDetailIfMatched(detail);
-    ElMessage.success('公告发布成功');
+    ElMessage.success('公告已发布');
     await loadAnnouncements();
   } catch (error) {
     console.error('发布公告失败', error);
@@ -565,7 +620,7 @@ const handlePublish = async (item: AdminAnnouncementItem) => {
 
 const handleOffline = async (item: AdminAnnouncementItem) => {
   try {
-    await ElMessageBox.confirm(`确认下线公告《${item.title}》吗？`, '下线确认', {
+    await ElMessageBox.confirm(`确认下线公告“${item.title}”吗？`, '下线公告', {
       type: 'warning',
       confirmButtonText: '确认下线',
       cancelButtonText: '取消',
@@ -589,7 +644,7 @@ const handleOffline = async (item: AdminAnnouncementItem) => {
 
 const handleDelete = async (item: AdminAnnouncementItem) => {
   try {
-    await ElMessageBox.confirm(`删除后不可恢复，确认删除公告《${item.title}》吗？`, '删除确认', {
+    await ElMessageBox.confirm(`确认永久删除公告“${item.title}”吗？`, '删除公告', {
       type: 'warning',
       confirmButtonText: '确认删除',
       cancelButtonText: '取消',
@@ -609,7 +664,7 @@ const handleDelete = async (item: AdminAnnouncementItem) => {
       detailData.value = null;
       currentDetailId.value = null;
     }
-    ElMessage.success('公告删除成功');
+    ElMessage.success('公告已删除');
     await loadAnnouncements();
   } catch (error) {
     console.error('删除公告失败', error);
@@ -622,27 +677,165 @@ onMounted(loadAnnouncements);
 </script>
 
 <style scoped lang="scss">
-.stat-card { padding: 22px; }
-.stat-card span { color: var(--qh-text-secondary); }
-.stat-card strong { display: block; margin: 14px 0 10px; font-size: 30px; color: var(--qh-primary-deep); }
-.stat-card p { margin: 0; color: var(--qh-text-secondary); }
-.filter-form { display: grid; grid-template-columns: minmax(0, 1.8fr) 220px auto; gap: 16px; align-items: end; }
-.filter-form :deep(.el-form-item) { margin-bottom: 0; }
-.filter-form__item { min-width: 0; }
+.stat-card {
+  padding: 22px;
+}
+
+.stat-card span {
+  color: var(--qh-text-secondary);
+}
+
+.stat-card strong {
+  display: block;
+  margin: 14px 0 10px;
+  font-size: 30px;
+  color: var(--qh-primary-deep);
+}
+
+.stat-card p {
+  margin: 0;
+  color: var(--qh-text-secondary);
+}
+
+.filter-overview {
+  margin-bottom: 18px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.filter-overview article,
+.detail-summary article {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.filter-overview span,
+.detail-summary span {
+  display: block;
+  color: var(--qh-text-secondary);
+}
+
+.filter-overview strong,
+.detail-summary strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 20px;
+  color: var(--qh-text-primary);
+  line-height: 1.5;
+}
+
+.filter-overview p {
+  margin: 8px 0 0;
+  line-height: 1.7;
+  color: var(--qh-text-secondary);
+}
+
+.filter-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) 220px auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.filter-form__item {
+  min-width: 0;
+}
+
 .filter-form__item :deep(.el-input),
-.filter-form__item :deep(.el-select) { width: 100%; }
+.filter-form__item :deep(.el-select) {
+  width: 100%;
+}
+
 .filter-actions,
 .card-actions,
 .dialog-footer,
-.table-actions { display: flex; gap: 12px; }
-.filter-actions { justify-content: flex-end; }
-.card-actions { align-items: center; }
-.table-skeleton { margin-top: 18px; }
-.state-panel { margin-top: 18px; padding: 12px; }
-.table-wrapper { margin-top: 18px; }
-.announcement-cell { display: grid; gap: 8px; }
-.announcement-cell__header { display: flex; align-items: center; gap: 10px; }
-.announcement-cell strong { color: var(--qh-text-primary); line-height: 1.5; }
+.table-actions,
+.table-headline__chips,
+.detail-tags,
+.detail-summary {
+  display: flex;
+  gap: 12px;
+}
+
+.filter-actions {
+  justify-content: flex-end;
+}
+
+.card-actions {
+  align-items: center;
+}
+
+.table-headline {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.table-headline strong {
+  color: var(--qh-text-primary);
+}
+
+.table-headline p {
+  margin: 8px 0 0;
+  color: var(--qh-text-secondary);
+  line-height: 1.8;
+}
+
+.info-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--qh-text-primary);
+  font-weight: 600;
+}
+
+.info-chip--dark {
+  background: rgba(32, 39, 51, 0.94);
+  color: #ffe27a;
+}
+
+.table-skeleton {
+  margin-top: 18px;
+}
+
+.state-panel {
+  margin-top: 18px;
+  padding: 12px;
+}
+
+.table-wrapper {
+  margin-top: 18px;
+}
+
+.announcement-cell {
+  display: grid;
+  gap: 8px;
+}
+
+.announcement-cell__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.announcement-cell strong {
+  color: var(--qh-text-primary);
+  line-height: 1.5;
+}
+
 .announcement-cell p {
   margin: 0;
   color: var(--qh-text-secondary);
@@ -652,17 +845,66 @@ onMounted(loadAnnouncements);
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.table-actions { flex-wrap: wrap; gap: 0 4px; }
-.pagination-bar { margin-top: 20px; display: flex; justify-content: flex-end; }
-.empty-wrapper { margin-top: 18px; }
-.detail-panel { min-height: 240px; }
-.detail-head { display: grid; gap: 12px; }
-.detail-head h2 { margin: 0; color: var(--qh-text-primary); line-height: 1.5; }
-.detail-tags { display: flex; flex-wrap: wrap; gap: 8px; }
-.detail-time { margin: 0; color: var(--qh-text-secondary); }
-.detail-section { margin-top: 24px; display: grid; gap: 10px; }
-.detail-section__label { font-size: 13px; color: var(--qh-text-secondary); }
-.detail-section p { margin: 0; line-height: 1.8; color: var(--qh-text-regular); }
+
+.table-actions {
+  flex-wrap: wrap;
+  gap: 0 4px;
+}
+
+.pagination-bar {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.empty-wrapper {
+  margin-top: 18px;
+}
+
+.detail-panel {
+  min-height: 240px;
+}
+
+.detail-head {
+  display: grid;
+  gap: 12px;
+}
+
+.detail-head h2 {
+  margin: 0;
+  color: var(--qh-text-primary);
+  line-height: 1.5;
+}
+
+.detail-tags {
+  flex-wrap: wrap;
+}
+
+.detail-summary {
+  flex-wrap: wrap;
+}
+
+.detail-summary article {
+  flex: 1 1 180px;
+}
+
+.detail-section {
+  margin-top: 24px;
+  display: grid;
+  gap: 10px;
+}
+
+.detail-section__label {
+  font-size: 13px;
+  color: var(--qh-text-secondary);
+}
+
+.detail-section p {
+  margin: 0;
+  line-height: 1.8;
+  color: var(--qh-text-regular);
+}
+
 .detail-content {
   padding: 16px;
   line-height: 1.9;
@@ -670,9 +912,36 @@ onMounted(loadAnnouncements);
   white-space: pre-wrap;
   border-radius: 16px;
 }
-.form-panel { min-height: 220px; }
-.announcement-form { margin-top: 4px; }
-.form-grid { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 18px; }
+
+.form-panel {
+  min-height: 220px;
+}
+
+.form-tips {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+}
+
+.form-tips strong {
+  color: var(--qh-text-primary);
+}
+
+.form-tips p {
+  margin: 10px 0 0;
+  color: var(--qh-text-secondary);
+  line-height: 1.8;
+}
+
+.announcement-form {
+  margin-top: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 18px;
+}
+
 .switch-group {
   height: 100%;
   padding: 14px 16px;
@@ -680,30 +949,72 @@ onMounted(loadAnnouncements);
   display: grid;
   gap: 14px;
 }
+
 .switch-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
-.switch-item strong { color: var(--qh-text-primary); }
-.switch-item p { margin: 6px 0 0; color: var(--qh-text-secondary); line-height: 1.6; }
-.dialog-footer { justify-content: flex-end; }
+
+.switch-item strong {
+  color: var(--qh-text-primary);
+}
+
+.switch-item p {
+  margin: 6px 0 0;
+  color: var(--qh-text-secondary);
+  line-height: 1.6;
+}
+
+.dialog-footer {
+  justify-content: flex-end;
+}
 
 @media (max-width: 1200px) {
-  .filter-form { grid-template-columns: minmax(0, 1fr) 220px; }
-  .filter-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .filter-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-form {
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .table-headline {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 900px) {
-  .form-grid { grid-template-columns: 1fr; }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .filter-form { grid-template-columns: 1fr; }
+  .filter-form {
+    grid-template-columns: 1fr;
+  }
+
   .filter-actions,
   .card-actions,
-  .pagination-bar { justify-content: flex-start; }
-  .pagination-bar { overflow-x: auto; }
+  .pagination-bar {
+    justify-content: flex-start;
+  }
+
+  .pagination-bar {
+    overflow-x: auto;
+  }
+
+  .table-headline__chips,
+  .detail-summary {
+    flex-wrap: wrap;
+  }
 }
 </style>

@@ -9,13 +9,31 @@
     </section>
 
     <section class="page-section">
-      <SectionCard title="筛选查询" subtitle="支持按关键字、状态和分类筛选管理员商品列表。">
+      <SectionCard title="筛选商品" subtitle="按关键词、状态与分类快速定位商品信息">
+        <div class="filter-overview qh-panel--subtle">
+          <article>
+            <span>商品总数</span>
+            <strong>{{ String(pagination.total).padStart(2, '0') }}</strong>
+            <p>当前筛选条件下的商品数量</p>
+          </article>
+          <article>
+            <span>筛选条件</span>
+            <strong>{{ currentFilterSummary }}</strong>
+            <p>支持标题、状态与分类组合检索</p>
+          </article>
+          <article>
+            <span>分页信息</span>
+            <strong>{{ pagination.pageSize }} / 页</strong>
+            <p>已加载分类 {{ categoryOptions.length }} 项</p>
+          </article>
+        </div>
+
         <el-form :inline="true" class="filter-form" @submit.prevent>
-          <el-form-item label="关键字" class="filter-form__item filter-form__item--keyword">
+          <el-form-item label="关键词" class="filter-form__item filter-form__item--keyword">
             <el-input
               v-model="filters.keyword"
               clearable
-              placeholder="搜索商品标题、卖家或分类"
+              placeholder="搜索商品标题或卖家"
               @keyup.enter="handleSearch"
             />
           </el-form-item>
@@ -38,24 +56,36 @@
     </section>
 
     <section class="page-section">
-      <SectionCard title="商品列表" subtitle="支持查看详情、管理员下架、重新上架和删除。">
+      <SectionCard title="商品列表" subtitle="支持查看详情、跳转前台与执行上下架操作">
         <template #extra>
           <div class="card-actions">
             <el-button text :loading="loading" @click="loadGoods">刷新</el-button>
           </div>
         </template>
 
+        <div class="table-headline qh-panel--subtle">
+          <div>
+            <strong>商品清单</strong>
+            <p>{{ listSummary }}</p>
+          </div>
+          <div class="table-headline__chips">
+            <span class="info-chip">当前 {{ tableData.length }} 条</span>
+            <span class="info-chip">每页 {{ pagination.pageSize }} 条</span>
+            <span v-if="hasFilters" class="info-chip info-chip--dark">已启用筛选</span>
+          </div>
+        </div>
+
         <el-alert
           type="info"
           show-icon
           :closable="false"
-          title="当前页面已接入真实管理员商品接口，操作后会自动刷新当前列表。"
+          title="接口已联调：支持管理员分页查询商品，并执行上下架、详情查看与删除操作。"
         />
 
         <el-skeleton v-if="loading && !tableData.length && !errorMessage" :rows="8" animated class="table-skeleton" />
 
         <div v-else-if="errorMessage" class="state-panel qh-panel--subtle">
-          <el-result icon="warning" title="商品列表加载失败" :sub-title="errorMessage">
+          <el-result icon="warning" title="加载失败" :sub-title="errorMessage">
             <template #extra>
               <el-button type="primary" @click="loadGoods">重新加载</el-button>
             </template>
@@ -65,7 +95,7 @@
         <template v-else-if="tableData.length">
           <div v-loading="loading" class="table-wrapper">
             <el-table :data="tableData" row-key="id" stripe class="goods-table">
-              <el-table-column label="商品信息" min-width="280">
+              <el-table-column label="商品信息" min-width="300">
                 <template #default="scope">
                   <div class="goods-cell">
                     <strong>{{ scope.row.title }}</strong>
@@ -90,8 +120,8 @@
               <el-table-column label="操作" min-width="320" fixed="right">
                 <template #default="scope">
                   <div class="table-actions">
-                    <el-button link type="primary" @click="handleOpenDetail(scope.row)">查看详情</el-button>
-                    <RouterLink class="table-link" :to="`/goods/${scope.row.id}`">前台详情</RouterLink>
+                    <el-button link type="primary" @click="handleOpenDetail(scope.row)">详情</el-button>
+                    <RouterLink class="table-link" :to="`/goods/${scope.row.id}`">前台查看</RouterLink>
                     <el-button
                       v-if="canOffShelf(scope.row)"
                       link
@@ -140,10 +170,10 @@
         </template>
 
         <div v-else class="empty-wrapper">
-          <EmptyHint title="暂无商品数据" description="当前筛选条件下没有匹配的商品记录。">
+          <EmptyHint title="暂无商品数据" description="当前条件下没有查询到商品">
             <template #actions>
-              <el-button type="primary" @click="handleReset">重置筛选</el-button>
-              <el-button @click="loadGoods">刷新列表</el-button>
+              <el-button type="primary" @click="handleReset">清空筛选</el-button>
+              <el-button @click="loadGoods">重新加载</el-button>
             </template>
           </EmptyHint>
         </div>
@@ -168,7 +198,16 @@
             <strong>{{ formatPrice(detailData.price) }}</strong>
             <span v-if="detailData.originalPrice > 0">原价 {{ formatPrice(detailData.originalPrice) }}</span>
           </p>
-          <p class="detail-meta">卖家：{{ detailData.sellerName }} · 校区：{{ detailData.campus }} · 成色：{{ detailData.condition }}</p>
+          <div class="detail-summary qh-panel--subtle">
+            <article>
+              <span>卖家</span>
+              <strong>{{ detailData.sellerName }}</strong>
+            </article>
+            <article>
+              <span>校区成色</span>
+              <strong>{{ detailData.campus }} · {{ detailData.condition }}</strong>
+            </article>
+          </div>
           <p class="detail-meta">发布时间：{{ formatDate(detailData.publishedAt) }}</p>
         </div>
 
@@ -201,12 +240,12 @@
         </div>
 
         <section class="detail-section">
-          <span class="detail-section__label">一句话简介</span>
+          <span class="detail-section__label">商品简介</span>
           <p>{{ detailData.intro }}</p>
         </section>
 
         <section class="detail-section">
-          <span class="detail-section__label">详细描述</span>
+          <span class="detail-section__label">商品详情</span>
           <div class="detail-content qh-panel--subtle">{{ detailData.description }}</div>
         </section>
 
@@ -219,7 +258,7 @@
         </section>
       </div>
       <div v-else class="detail-empty-wrapper">
-        <EmptyHint title="暂无详情数据" description="请重新选择商品后再试。" />
+        <EmptyHint title="暂无详情" description="未能加载商品详细信息" />
       </div>
     </el-drawer>
   </div>
@@ -273,17 +312,29 @@ const pagination = reactive({
   total: 0,
 });
 
-const stats = computed(() => {
-  const currentPageReserved = tableData.value.filter((item) => item.status === 'reserved').length;
-  const currentPageOffShelf = tableData.value.filter((item) => item.status === 'off_shelf').length;
-  const currentPageOnSale = tableData.value.filter((item) => item.status === 'on_sale').length;
-  return [
-    { label: '商品总数', value: String(pagination.total).padStart(2, '0'), tip: '管理员可见的商品总记录数' },
-    { label: '本页在售', value: String(currentPageOnSale).padStart(2, '0'), tip: '当前页仍处于在售状态的商品数' },
-    { label: '本页预约', value: String(currentPageReserved).padStart(2, '0'), tip: '当前页已被预约的商品数' },
-    { label: '本页下架', value: String(currentPageOffShelf).padStart(2, '0'), tip: '当前页处于下架状态的商品数' },
-  ];
+const currentPageReserved = computed(() => tableData.value.filter((item) => item.status === 'reserved').length);
+const currentPageOffShelf = computed(() => tableData.value.filter((item) => item.status === 'off_shelf').length);
+const currentPageOnSale = computed(() => tableData.value.filter((item) => item.status === 'on_sale').length);
+const hasFilters = computed(() => Boolean(filters.keyword.trim()) || Boolean(filters.status) || Boolean(filters.category));
+
+const stats = computed(() => [
+  { label: '商品总数', value: String(pagination.total).padStart(2, '0'), tip: '符合当前筛选条件的商品数' },
+  { label: '在售中', value: String(currentPageOnSale.value).padStart(2, '0'), tip: '当前页可直接浏览的商品' },
+  { label: '已预约', value: String(currentPageReserved.value).padStart(2, '0'), tip: '当前页已被预约的商品' },
+  { label: '已下架', value: String(currentPageOffShelf.value).padStart(2, '0'), tip: '当前页已下架的商品数' },
+]);
+
+const currentFilterSummary = computed(() => {
+  const parts: string[] = [];
+  if (filters.keyword.trim()) parts.push(`关键词“${filters.keyword.trim()}”`);
+  if (filters.status) parts.push(`状态 ${getGoodsStatusMeta(filters.status).text}`);
+  if (filters.category) parts.push(`分类 ${filters.category}`);
+  return parts.join(' · ') || '全部商品';
 });
+
+const listSummary = computed(() => (hasFilters.value
+  ? `当前按 ${currentFilterSummary.value} 共筛选到 ${pagination.total} 件商品`
+  : `当前共有 ${pagination.total} 件商品，可查看详情并执行管理员操作`));
 
 type GoodsActionTarget = Pick<AdminGoodsItem, 'id' | 'title' | 'status'>;
 
@@ -292,7 +343,7 @@ const loadCategories = async () => {
     const categories = await getCategories();
     categoryOptions.value = categories.map((item) => item.name);
   } catch (error) {
-    console.error('加载商品分类失败', error);
+    console.error('商品分类加载失败', error);
   }
 };
 
@@ -312,8 +363,8 @@ const loadGoods = async () => {
     pagination.pageNum = result.pageNum;
     pagination.pageSize = result.pageSize;
   } catch (error) {
-    console.error('加载管理员商品列表失败', error);
-    errorMessage.value = '管理员商品列表加载失败，请稍后重试。';
+    console.error('管理员商品列表加载失败', error);
+    errorMessage.value = '商品列表加载失败，请稍后重试。';
   } finally {
     loading.value = false;
   }
@@ -345,7 +396,7 @@ const handleOpenDetail = async (item: AdminGoodsItem) => {
   try {
     detailData.value = await getAdminGoodsDetail(item.id);
   } catch (error) {
-    console.error('加载管理员商品详情失败', error);
+    console.error('商品详情加载失败', error);
     detailData.value = null;
   } finally {
     detailLoading.value = false;
@@ -365,11 +416,11 @@ const syncDetailIfMatched = (detail: AdminGoodsDetail) => {
 
 const handleOffShelf = async (item: GoodsActionTarget) => {
   if (!canOffShelf(item)) {
-    ElMessage.warning('当前商品状态不支持下架。');
+    ElMessage.warning('当前商品状态不可下架');
     return;
   }
   try {
-    await ElMessageBox.confirm(`确认下架商品《${item.title}》吗？`, '下架确认', {
+    await ElMessageBox.confirm(`确认下架商品“${item.title}”吗？`, '下架商品', {
       type: 'warning',
       confirmButtonText: '确认下架',
       cancelButtonText: '取消',
@@ -385,7 +436,7 @@ const handleOffShelf = async (item: GoodsActionTarget) => {
     ElMessage.success('商品已下架');
     await loadGoods();
   } catch (error) {
-    console.error('管理员下架商品失败', error);
+    console.error('下架商品失败', error);
   } finally {
     currentActionKey.value = '';
   }
@@ -393,11 +444,11 @@ const handleOffShelf = async (item: GoodsActionTarget) => {
 
 const handleRelist = async (item: GoodsActionTarget) => {
   if (!canRelist(item)) {
-    ElMessage.warning('当前商品状态不支持重新上架。');
+    ElMessage.warning('当前商品状态不可重新上架');
     return;
   }
   try {
-    await ElMessageBox.confirm(`确认重新上架商品《${item.title}》吗？`, '重新上架确认', {
+    await ElMessageBox.confirm(`确认重新上架商品“${item.title}”吗？`, '重新上架', {
       type: 'warning',
       confirmButtonText: '确认上架',
       cancelButtonText: '取消',
@@ -413,7 +464,7 @@ const handleRelist = async (item: GoodsActionTarget) => {
     ElMessage.success('商品已重新上架');
     await loadGoods();
   } catch (error) {
-    console.error('管理员重新上架商品失败', error);
+    console.error('重新上架商品失败', error);
   } finally {
     currentActionKey.value = '';
   }
@@ -421,11 +472,11 @@ const handleRelist = async (item: GoodsActionTarget) => {
 
 const handleDelete = async (item: GoodsActionTarget) => {
   if (!canDelete(item)) {
-    ElMessage.warning('已预约商品暂不支持直接删除。');
+    ElMessage.warning('预约中的商品暂不支持删除');
     return;
   }
   try {
-    await ElMessageBox.confirm(`删除后不可恢复，确认删除商品《${item.title}》吗？`, '删除确认', {
+    await ElMessageBox.confirm(`确认永久删除商品“${item.title}”吗？`, '删除商品', {
       type: 'warning',
       confirmButtonText: '确认删除',
       cancelButtonText: '取消',
@@ -445,10 +496,10 @@ const handleDelete = async (item: GoodsActionTarget) => {
       detailData.value = null;
       currentDetailId.value = null;
     }
-    ElMessage.success('商品删除成功');
+    ElMessage.success('商品已删除');
     await loadGoods();
   } catch (error) {
-    console.error('管理员删除商品失败', error);
+    console.error('删除商品失败', error);
   } finally {
     currentActionKey.value = '';
   }
@@ -460,50 +511,256 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-.stat-card { padding: 22px; }
-.stat-card span { color: var(--qh-text-secondary); }
-.stat-card strong { display: block; margin: 14px 0 10px; font-size: 30px; color: var(--qh-primary-deep); }
-.stat-card p { margin: 0; color: var(--qh-text-secondary); }
-.filter-form { display: grid; grid-template-columns: minmax(0, 1.8fr) 180px 180px auto; gap: 16px; align-items: end; }
-.filter-form :deep(.el-form-item) { margin-bottom: 0; }
-.filter-form__item { min-width: 0; }
+.stat-card {
+  padding: 22px;
+}
+
+.stat-card span {
+  color: var(--qh-text-secondary);
+}
+
+.stat-card strong {
+  display: block;
+  margin: 14px 0 10px;
+  font-size: 30px;
+  color: var(--qh-primary-deep);
+}
+
+.stat-card p {
+  margin: 0;
+  color: var(--qh-text-secondary);
+}
+
+.filter-overview {
+  margin-bottom: 18px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.filter-overview article,
+.detail-summary article {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.filter-overview span,
+.detail-summary span {
+  display: block;
+  color: var(--qh-text-secondary);
+}
+
+.filter-overview strong,
+.detail-summary strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 20px;
+  color: var(--qh-text-primary);
+  line-height: 1.5;
+}
+
+.filter-overview p {
+  margin: 8px 0 0;
+  line-height: 1.7;
+  color: var(--qh-text-secondary);
+}
+
+.filter-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) 180px 180px auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.filter-form__item {
+  min-width: 0;
+}
+
 .filter-form__item :deep(.el-input),
-.filter-form__item :deep(.el-select) { width: 100%; }
+.filter-form__item :deep(.el-select) {
+  width: 100%;
+}
+
 .filter-actions,
 .card-actions,
 .table-actions,
 .detail-tags,
-.detail-actions { display: flex; gap: 12px; }
-.filter-actions { justify-content: flex-end; }
-.card-actions { align-items: center; }
-.table-skeleton { margin-top: 18px; }
-.state-panel { margin-top: 18px; padding: 12px; }
-.table-wrapper { margin-top: 18px; }
-.goods-cell { display: grid; gap: 8px; }
-.goods-cell strong { color: var(--qh-text-primary); line-height: 1.5; }
+.detail-actions,
+.table-headline__chips,
+.detail-summary {
+  display: flex;
+  gap: 12px;
+}
+
+.filter-actions {
+  justify-content: flex-end;
+}
+
+.card-actions {
+  align-items: center;
+}
+
+.table-headline {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.table-headline strong {
+  color: var(--qh-text-primary);
+}
+
+.table-headline p {
+  margin: 8px 0 0;
+  color: var(--qh-text-secondary);
+  line-height: 1.8;
+}
+
+.info-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--qh-text-primary);
+  font-weight: 600;
+}
+
+.info-chip--dark {
+  background: rgba(32, 39, 51, 0.94);
+  color: #ffe27a;
+}
+
+.table-skeleton {
+  margin-top: 18px;
+}
+
+.state-panel {
+  margin-top: 18px;
+  padding: 12px;
+}
+
+.table-wrapper {
+  margin-top: 18px;
+}
+
+.goods-cell {
+  display: grid;
+  gap: 8px;
+}
+
+.goods-cell strong {
+  color: var(--qh-text-primary);
+  line-height: 1.5;
+}
+
 .goods-cell p,
 .detail-meta,
-.detail-empty { margin: 0; color: var(--qh-text-secondary); font-size: 13px; line-height: 1.7; }
-.table-actions { flex-wrap: wrap; gap: 0 4px; }
-.table-link { color: var(--qh-primary-deep); }
-.pagination-bar { margin-top: 20px; display: flex; justify-content: flex-end; }
-.empty-wrapper { margin-top: 18px; }
-.detail-panel { min-height: 260px; }
-.detail-head { display: grid; gap: 12px; }
-.detail-tags { flex-wrap: wrap; }
-.detail-head h2 { margin: 0; color: var(--qh-text-primary); line-height: 1.5; }
-.detail-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin: 0; }
-.detail-price strong { font-size: 28px; color: var(--qh-primary-deep); }
-.detail-price span { color: var(--qh-text-secondary); }
+.detail-empty {
+  margin: 0;
+  color: var(--qh-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.table-actions {
+  flex-wrap: wrap;
+  gap: 0 4px;
+}
+
+.table-link {
+  color: var(--qh-primary-deep);
+}
+
+.pagination-bar {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.empty-wrapper {
+  margin-top: 18px;
+}
+
+.detail-panel {
+  min-height: 260px;
+}
+
+.detail-head {
+  display: grid;
+  gap: 12px;
+}
+
+.detail-tags {
+  flex-wrap: wrap;
+}
+
+.detail-head h2 {
+  margin: 0;
+  color: var(--qh-text-primary);
+  line-height: 1.5;
+}
+
+.detail-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+}
+
+.detail-price strong {
+  font-size: 28px;
+  color: var(--qh-primary-deep);
+}
+
+.detail-price span {
+  color: var(--qh-text-secondary);
+}
+
+.detail-summary {
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.detail-summary article {
+  flex: 1 1 180px;
+}
+
 .detail-actions {
   margin-top: 20px;
   padding: 16px;
   border-radius: 18px;
   flex-wrap: wrap;
 }
-.detail-section { margin-top: 24px; display: grid; gap: 10px; }
-.detail-section__label { font-size: 13px; color: var(--qh-text-secondary); }
-.detail-section p { margin: 0; line-height: 1.8; color: var(--qh-text-regular); }
+
+.detail-section {
+  margin-top: 24px;
+  display: grid;
+  gap: 10px;
+}
+
+.detail-section__label {
+  font-size: 13px;
+  color: var(--qh-text-secondary);
+}
+
+.detail-section p {
+  margin: 0;
+  line-height: 1.8;
+  color: var(--qh-text-regular);
+}
+
 .detail-content {
   padding: 16px;
   line-height: 1.9;
@@ -511,18 +768,49 @@ onMounted(async () => {
   white-space: pre-wrap;
   border-radius: 16px;
 }
+
 .detail-empty-wrapper,
-.detail-loading { padding: 8px 0; }
+.detail-loading {
+  padding: 8px 0;
+}
 
 @media (max-width: 1200px) {
-  .filter-form { grid-template-columns: minmax(0, 1fr) 180px 180px; }
-  .filter-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .filter-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-form {
+    grid-template-columns: minmax(0, 1fr) 180px 180px;
+  }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .table-headline {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 768px) {
-  .filter-form { grid-template-columns: 1fr; }
+  .filter-form {
+    grid-template-columns: 1fr;
+  }
+
   .filter-actions,
-  .pagination-bar { justify-content: flex-start; }
-  .pagination-bar { overflow-x: auto; }
+  .pagination-bar {
+    justify-content: flex-start;
+  }
+
+  .pagination-bar {
+    overflow-x: auto;
+  }
+
+  .table-headline__chips,
+  .detail-summary {
+    flex-wrap: wrap;
+  }
 }
 </style>
