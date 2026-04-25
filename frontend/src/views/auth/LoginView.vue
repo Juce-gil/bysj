@@ -39,6 +39,7 @@ import { reactive, ref } from 'vue';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
+import { extractErrorMessage } from '@/utils/error';
 
 const router = useRouter();
 const route = useRoute();
@@ -54,11 +55,15 @@ const fillAdminDemo = () => { form.username = 'admin'; form.password = '123456';
 const handleSubmit = async () => {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
-  const result = await userStore.login({ ...form });
-  ElMessage.success(`欢迎回来，${result.profile.name}`);
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '';
-  if (redirect) return router.push(redirect);
-  router.push(result.profile.role === 'admin' ? '/admin/dashboard' : '/user/dashboard');
+  try {
+    const result = await userStore.login({ ...form });
+    ElMessage.success(`欢迎回来，${result.profile.name}`);
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '';
+    if (redirect) return router.push(redirect);
+    router.push(result.profile.role === 'admin' ? '/admin/dashboard' : '/user/dashboard');
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '登录失败，请稍后重试'));
+  }
 };
 </script>
 

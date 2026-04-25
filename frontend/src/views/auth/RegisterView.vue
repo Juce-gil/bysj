@@ -32,6 +32,7 @@ import { reactive, ref } from 'vue';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { RouterLink, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
+import { extractErrorMessage } from '@/utils/error';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -49,9 +50,13 @@ const rules: FormRules = {
 const handleSubmit = async () => {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
-  const result = await userStore.register({ ...form });
-  ElMessage.success(result.message);
-  router.push('/login');
+  try {
+    const result = await userStore.register({ ...form });
+    ElMessage.success(result.message);
+    router.push('/login');
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '注册失败，请稍后重试'));
+  }
 };
 </script>
 

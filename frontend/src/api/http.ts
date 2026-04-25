@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { ElMessage } from 'element-plus';
 import { storage } from '@/utils/storage';
+import { normalizeErrorMessage } from '@/utils/error';
 
 interface ApiEnvelope<T = unknown> {
   code?: number;
@@ -25,16 +25,13 @@ service.interceptors.response.use(
   (response) => {
     const payload = response.data as ApiEnvelope | undefined;
     if (payload && typeof payload === 'object' && typeof payload.code === 'number' && payload.code !== 200) {
-      const message = payload.message || '请求失败，请稍后再试';
-      ElMessage.error(message);
-      return Promise.reject(new Error(message));
+      return Promise.reject(new Error(normalizeErrorMessage(payload.message, '请求失败，请稍后重试')));
     }
     return response.data;
   },
   (error) => {
-    const message = error?.response?.data?.message || error?.message || '请求失败，请稍后再试';
-    ElMessage.error(message);
-    return Promise.reject(error);
+    const message = normalizeErrorMessage(error?.response?.data?.message || error?.message, '请求失败，请稍后重试');
+    return Promise.reject(new Error(message));
   },
 );
 

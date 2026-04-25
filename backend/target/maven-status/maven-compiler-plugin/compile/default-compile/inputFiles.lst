@@ -69,9 +69,11 @@ E:\毕设\backend\src\main\java\com\kecheng\market\common\log\TraceContext.java
 E:\毕设\backend\src\main\java\com\kecheng\market\common\PageResult.java
 E:\毕设\backend\src\main\java\com\kecheng\market\common\store\MarketPersistenceService.java
 E:\毕设\backend\src\main\java\com\kecheng\market\common\store\MarketStore.java
+E:\毕设\backend\src\main\java\com\kecheng\market\common\store\StorageAccessSupport.java
 E:\毕设\backend\src\main\java\com\kecheng\market\common\util\DateTimeUtil.java
 E:\毕设\backend\src\main\java\com\kecheng\market\config\CorsConfig.java
 E:\毕设\backend\src\main\java\com\kecheng\market\config\MybatisPlusConfig.java
+E:\毕设\backend\src\main\java\com\kecheng\market\config\ProductionEnvironmentValidator.java
 E:\毕设\backend\src\main\java\com\kecheng\market\config\SwaggerConfig.java
 E:\毕设\backend\src\main\java\com\kecheng\market\config\WebMvcConfig.java
 E:\毕设\backend\src\main\java\com\kecheng\market\favorite\controller\FavoriteController.java

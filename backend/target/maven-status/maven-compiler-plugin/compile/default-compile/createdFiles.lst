@@ -50,6 +50,7 @@ com\kecheng\market\admin\vo\AdminAnnouncementListItemVo.class
 com\kecheng\market\admin\service\impl\AdminAnnouncementServiceImpl.class
 com\kecheng\market\upload\service\UploadService.class
 com\kecheng\market\common\filter\TraceIdFilter.class
+com\kecheng\market\config\ProductionEnvironmentValidator.class
 com\kecheng\market\admin\dto\AdminUserQuery.class
 com\kecheng\market\banner\service\BannerService.class
 com\kecheng\market\common\util\DateTimeUtil.class
@@ -105,6 +106,7 @@ com\kecheng\market\MarketApplication.class
 com\kecheng\market\common\log\RequestLogFormatter.class
 com\kecheng\market\appointment\service\AppointmentService.class
 com\kecheng\market\goods\vo\GoodsVo.class
+com\kecheng\market\common\store\StorageAccessSupport.class
 com\kecheng\market\security\util\JwtUtil.class
 com\kecheng\market\comment\mapper\CommentMapper.class
 com\kecheng\market\admin\controller\AdminGoodsController.class

@@ -7,4 +7,5 @@ public interface NotificationService {
     List<NotificationVo> list(Long userId);
     long unreadCount(Long userId);
     void markRead(Long userId, Long id);
+    void markAllRead(Long userId);
 }

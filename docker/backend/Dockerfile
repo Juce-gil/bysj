@@ -20,6 +20,7 @@ ENV DB_URL=jdbc:mysql://mysql:3306/kecheng_campus_market
 ENV DB_USERNAME=market_user
 ENV DB_PASSWORD=market_password
 ENV JWT_SECRET=your-production-jwt-secret-key-2025
+ENV JAVA_OPTS=""
 
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

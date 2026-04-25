@@ -8,6 +8,7 @@ import com.kecheng.market.admin.vo.AdminAnnouncementListItemVo;
 import com.kecheng.market.common.PageResult;
 import com.kecheng.market.common.store.MarketPersistenceService;
 import com.kecheng.market.common.store.MarketStore;
+import com.kecheng.market.common.store.StorageAccessSupport;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -15,79 +16,72 @@ import org.springframework.stereotype.Service;
 @Service
 public class AdminAnnouncementServiceImpl implements AdminAnnouncementService {
 
-    private final String storageMode;
-    private final MarketStore marketStore;
-    private final MarketPersistenceService persistenceService;
+    private final StorageAccessSupport storage;
 
     public AdminAnnouncementServiceImpl(
             @Value("${market.storage-mode:mysql}") String storageMode,
             ObjectProvider<MarketStore> marketStoreProvider,
             ObjectProvider<MarketPersistenceService> persistenceServiceProvider) {
-        this.storageMode = storageMode;
-        this.marketStore = marketStoreProvider.getIfAvailable();
-        this.persistenceService = persistenceServiceProvider.getIfAvailable();
+        this.storage = new StorageAccessSupport(
+                storageMode,
+                marketStoreProvider.getIfAvailable(),
+                persistenceServiceProvider.getIfAvailable()
+        );
     }
 
     @Override
     public PageResult<AdminAnnouncementListItemVo> page(AdminAnnouncementQuery query) {
-        return useMysql()
-                ? requirePersistence().pageAdminAnnouncements(query)
-                : requireStore().pageAdminAnnouncements(query.getKeyword(), query.getPublished(), query.getPageNum(), query.getPageSize());
+        return storage.route(
+                () -> storage.mysqlStore().pageAdminAnnouncements(query),
+                () -> storage.memoryStore().pageAdminAnnouncements(query.getKeyword(), query.getPublished(), query.getPageNum(), query.getPageSize())
+        );
     }
 
     @Override
     public AdminAnnouncementDetailVo detail(Long id) {
-        return useMysql() ? requirePersistence().getAdminAnnouncementDetail(id) : requireStore().getAdminAnnouncementDetail(id);
+        return storage.route(
+                () -> storage.mysqlStore().getAdminAnnouncementDetail(id),
+                () -> storage.memoryStore().getAdminAnnouncementDetail(id)
+        );
     }
 
     @Override
     public AdminAnnouncementDetailVo create(AdminAnnouncementSaveRequest request) {
-        return useMysql()
-                ? requirePersistence().createAdminAnnouncement(request)
-                : requireStore().createAdminAnnouncement(request.title(), request.summary(), request.content(), request.level(), request.top(), request.published());
+        return storage.route(
+                () -> storage.mysqlStore().createAdminAnnouncement(request),
+                () -> storage.memoryStore().createAdminAnnouncement(request.title(), request.summary(), request.content(), request.level(), request.top(), request.published())
+        );
     }
 
     @Override
     public AdminAnnouncementDetailVo update(Long id, AdminAnnouncementSaveRequest request) {
-        return useMysql()
-                ? requirePersistence().updateAdminAnnouncement(id, request)
-                : requireStore().updateAdminAnnouncement(id, request.title(), request.summary(), request.content(), request.level(), request.top(), request.published());
+        return storage.route(
+                () -> storage.mysqlStore().updateAdminAnnouncement(id, request),
+                () -> storage.memoryStore().updateAdminAnnouncement(id, request.title(), request.summary(), request.content(), request.level(), request.top(), request.published())
+        );
     }
 
     @Override
     public AdminAnnouncementDetailVo publish(Long id) {
-        return useMysql() ? requirePersistence().publishAdminAnnouncement(id) : requireStore().publishAdminAnnouncement(id);
+        return storage.route(
+                () -> storage.mysqlStore().publishAdminAnnouncement(id),
+                () -> storage.memoryStore().publishAdminAnnouncement(id)
+        );
     }
 
     @Override
     public AdminAnnouncementDetailVo offline(Long id) {
-        return useMysql() ? requirePersistence().offlineAdminAnnouncement(id) : requireStore().offlineAdminAnnouncement(id);
+        return storage.route(
+                () -> storage.mysqlStore().offlineAdminAnnouncement(id),
+                () -> storage.memoryStore().offlineAdminAnnouncement(id)
+        );
     }
 
     @Override
     public void delete(Long id) {
-        if (useMysql()) {
-            requirePersistence().deleteAdminAnnouncement(id);
-            return;
-        }
-        requireStore().deleteAdminAnnouncement(id);
-    }
-
-    private boolean useMysql() {
-        return "mysql".equalsIgnoreCase(storageMode);
-    }
-
-    private MarketPersistenceService requirePersistence() {
-        if (persistenceService == null) {
-            throw new IllegalStateException("MySQL persistence service is not available");
-        }
-        return persistenceService;
-    }
-
-    private MarketStore requireStore() {
-        if (marketStore == null) {
-            throw new IllegalStateException("Memory store is not available");
-        }
-        return marketStore;
+        storage.route(
+                () -> storage.mysqlStore().deleteAdminAnnouncement(id),
+                () -> storage.memoryStore().deleteAdminAnnouncement(id)
+        );
     }
 }

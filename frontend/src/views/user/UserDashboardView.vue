@@ -16,8 +16,8 @@
           <span class="overview-badge">科成校园个人中心</span>
           <h2>在个人中心，一站式管理我的通知、收藏、预约与发布。</h2>
           <p>
-            用户端后台同步采用与前台一致的黄黑暖色风格，保留收藏、预约、消息、发布与资料管理的完整联动能力，
-            更适合毕业设计展示和日常使用。
+            用户端后台延续前台的统一视觉风格，集中展示收藏、预约、消息、资料与发布数据，
+            更适合演示完整业务链路，也方便日常使用。
           </p>
 
           <div class="overview-actions">
@@ -54,9 +54,9 @@
 
         <aside class="overview-banner__aside">
           <div class="overview-aside__card">
-            <span>今日推荐</span>
-            <strong>让每一条通知、每一次预约和每一件收藏，都在统一风格里更清晰呈现。</strong>
-            <p>适合展示用户中心与前台首页之间的风格一致性和交互联动性。</p>
+            <span>今日建议</span>
+            <strong>把通知、预约、收藏和资料都收拢到一个页面里，演示和管理都会更顺手。</strong>
+            <p>适合展示用户中心与首页、详情页、管理端之间的联动关系，也便于快速进入下一步操作。</p>
           </div>
           <div class="overview-aside__stats">
             <article>
@@ -81,7 +81,7 @@
     </section>
 
     <section class="page-section grid-layout">
-      <SectionCard title="快捷入口" subtitle="把常用功能集中到一处，方便快速跳转和完整演示用户链路。">
+      <SectionCard title="快捷入口" subtitle="把常用功能集中到一处，方便快速跳转并串联完整的用户操作路径。">
         <div class="quick-actions">
           <RouterLink v-for="item in actions" :key="item.title" :to="item.to" class="quick-card qh-panel--subtle">
             <span class="quick-card__badge">{{ item.badge }}</span>
@@ -91,7 +91,7 @@
         </div>
       </SectionCard>
 
-      <SectionCard title="账号概览" subtitle="展示当前登录用户的基础资料与联系信息摘要。">
+      <SectionCard title="账号概览" subtitle="展示当前登录用户的基础资料和联系方式摘要。">
         <div class="profile-hero qh-panel--subtle">
           <div>
             <span>当前账号</span>
@@ -150,7 +150,7 @@
             </div>
           </article>
         </div>
-        <EmptyHint v-else title="暂时没有通知" description="新消息到达后，会在这里优先展示最近几条内容。" />
+        <EmptyHint v-else title="暂时没有通知" description="新的系统消息到来后，这里会优先展示最近几条内容。" />
       </SectionCard>
 
       <SectionCard title="最近预约" subtitle="展示最近预约记录，帮助你快速回看线下面交安排。">
@@ -194,6 +194,7 @@ import {
 import { useUserStore } from '@/stores/user';
 import { getAppointmentStatusMeta } from '@/utils/status';
 import { getNotificationActionLabel, getNotificationTypeMeta, resolveNotificationTarget } from '@/utils/notification';
+import { extractErrorMessage } from '@/utils/error';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -205,10 +206,10 @@ const loading = ref(false);
 const errorMessage = ref('');
 
 const stats = computed(() => [
-  { label: '收藏数量', value: String(favoriteCount.value).padStart(2, '0'), tip: '已接入真实收藏列表' },
+  { label: '收藏数量', value: String(favoriteCount.value).padStart(2, '0'), tip: '已接入真实收藏列表数据' },
   { label: '预约记录', value: String(appointments.value.length).padStart(2, '0'), tip: '展示最近预约动态' },
   { label: '未读通知', value: String(unreadCount.value).padStart(2, '0'), tip: '帮助你及时跟进待处理事项' },
-  { label: '当前身份', value: userStore.role === 'admin' ? 'AD' : 'US', tip: '支持前后台角色联动' },
+  { label: '当前身份', value: userStore.role === 'admin' ? 'AD' : 'US', tip: '支持前后台角色联动展示' },
 ]);
 
 const actions = [
@@ -231,10 +232,13 @@ const handleMarkRead = async (item: NotificationItem) => {
   if (item.isRead) {
     return;
   }
-
-  await markNotificationRead(item.id);
-  syncReadState(item.id);
-  ElMessage.success('已标记为已读');
+  try {
+    await markNotificationRead(item.id);
+    syncReadState(item.id);
+    ElMessage.success('已标记为已读');
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '标记通知失败，请稍后重试'));
+  }
 };
 
 const handleOpenNotification = async (item: NotificationItem) => {
@@ -244,12 +248,15 @@ const handleOpenNotification = async (item: NotificationItem) => {
     return;
   }
 
-  if (!item.isRead) {
-    await markNotificationRead(item.id);
-    syncReadState(item.id);
+  try {
+    if (!item.isRead) {
+      await markNotificationRead(item.id);
+      syncReadState(item.id);
+    }
+    await router.push(target);
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '打开通知详情失败，请稍后重试'));
   }
-
-  await router.push(target);
 };
 
 const loadData = async () => {
@@ -268,7 +275,7 @@ const loadData = async () => {
     favoriteCount.value = favorites.length;
   } catch (error) {
     console.error('加载用户中心概览失败', error);
-    errorMessage.value = '用户中心概览加载失败，请稍后重新刷新。';
+    errorMessage.value = extractErrorMessage(error, '用户中心概览加载失败，请稍后刷新重试。');
   } finally {
     loading.value = false;
   }

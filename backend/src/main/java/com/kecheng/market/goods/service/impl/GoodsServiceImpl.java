@@ -2,6 +2,7 @@ package com.kecheng.market.goods.service.impl;
 
 import com.kecheng.market.common.store.MarketPersistenceService;
 import com.kecheng.market.common.store.MarketStore;
+import com.kecheng.market.common.store.StorageAccessSupport;
 import com.kecheng.market.goods.service.GoodsService;
 import com.kecheng.market.goods.vo.GoodsVo;
 import java.math.BigDecimal;
@@ -13,94 +14,98 @@ import org.springframework.stereotype.Service;
 @Service
 public class GoodsServiceImpl implements GoodsService {
 
-    private final String storageMode;
-    private final MarketStore marketStore;
-    private final MarketPersistenceService persistenceService;
+    private final StorageAccessSupport storage;
 
     public GoodsServiceImpl(
             @Value("${market.storage-mode:mysql}") String storageMode,
             ObjectProvider<MarketStore> marketStoreProvider,
             ObjectProvider<MarketPersistenceService> persistenceServiceProvider) {
-        this.storageMode = storageMode;
-        this.marketStore = marketStoreProvider.getIfAvailable();
-        this.persistenceService = persistenceServiceProvider.getIfAvailable();
+        this.storage = new StorageAccessSupport(
+                storageMode,
+                marketStoreProvider.getIfAvailable(),
+                persistenceServiceProvider.getIfAvailable()
+        );
     }
 
     @Override
     public List<GoodsVo> list(Long userId) {
-        return useMysql() ? requirePersistence().listGoods(userId) : requireStore().listGoods(userId);
+        return storage.route(
+                () -> storage.mysqlStore().listGoods(userId),
+                () -> storage.memoryStore().listGoods(userId)
+        );
     }
 
     @Override
     public List<GoodsVo> myGoods(Long userId) {
-        return useMysql() ? requirePersistence().listMyGoods(userId) : requireStore().listMyGoods(userId);
+        return storage.route(
+                () -> storage.mysqlStore().listMyGoods(userId),
+                () -> storage.memoryStore().listMyGoods(userId)
+        );
     }
 
     @Override
     public GoodsVo detail(Long id, Long userId) {
-        return useMysql() ? requirePersistence().getGoodsDetail(id, userId) : requireStore().getGoodsDetail(id, userId);
+        return storage.route(
+                () -> storage.mysqlStore().getGoodsDetail(id, userId),
+                () -> storage.memoryStore().getGoodsDetail(id, userId)
+        );
     }
 
     @Override
     public boolean toggleFavorite(Long userId, Long goodsId) {
-        return useMysql() ? requirePersistence().toggleFavorite(userId, goodsId) : requireStore().toggleFavorite(userId, goodsId);
+        return storage.route(
+                () -> storage.mysqlStore().toggleFavorite(userId, goodsId),
+                () -> storage.memoryStore().toggleFavorite(userId, goodsId)
+        );
     }
 
     @Override
     public List<GoodsVo> myFavorites(Long userId) {
-        return useMysql() ? requirePersistence().listMyFavorites(userId) : requireStore().listMyFavorites(userId);
+        return storage.route(
+                () -> storage.mysqlStore().listMyFavorites(userId),
+                () -> storage.memoryStore().listMyFavorites(userId)
+        );
     }
 
     @Override
     public GoodsVo create(Long userId, String title, BigDecimal price, BigDecimal originalPrice, String category, String campus,
                           String condition, String intro, String description, List<String> tags, List<String> imageUrls) {
-        return useMysql()
-                ? requirePersistence().createGoods(userId, title, price, originalPrice, category, campus, condition, intro, description, tags, imageUrls)
-                : requireStore().createGoods(userId, title, price, originalPrice, category, campus, condition, intro, description, tags, imageUrls);
+        return storage.route(
+                () -> storage.mysqlStore().createGoods(userId, title, price, originalPrice, category, campus, condition, intro, description, tags, imageUrls),
+                () -> storage.memoryStore().createGoods(userId, title, price, originalPrice, category, campus, condition, intro, description, tags, imageUrls)
+        );
     }
 
     @Override
     public GoodsVo update(Long userId, Long goodsId, String title, BigDecimal price, BigDecimal originalPrice, String category,
                           String campus, String condition, String intro, String description, List<String> tags, List<String> imageUrls) {
-        return useMysql()
-                ? requirePersistence().updateGoods(userId, goodsId, title, price, originalPrice, category, campus, condition, intro, description, tags, imageUrls)
-                : requireStore().updateGoods(userId, goodsId, title, price, originalPrice, category, campus, condition, intro, description, tags, imageUrls);
+        return storage.route(
+                () -> storage.mysqlStore().updateGoods(userId, goodsId, title, price, originalPrice, category, campus, condition, intro, description, tags, imageUrls),
+                () -> storage.memoryStore().updateGoods(userId, goodsId, title, price, originalPrice, category, campus, condition, intro, description, tags, imageUrls)
+        );
     }
 
     @Override
     public GoodsVo offShelf(Long userId, Long goodsId) {
-        return useMysql() ? requirePersistence().offShelfGoods(userId, goodsId) : requireStore().offShelfGoods(userId, goodsId);
+        return storage.route(
+                () -> storage.mysqlStore().offShelfGoods(userId, goodsId),
+                () -> storage.memoryStore().offShelfGoods(userId, goodsId)
+        );
     }
 
     @Override
     public GoodsVo relist(Long userId, Long goodsId) {
-        return useMysql() ? requirePersistence().relistGoods(userId, goodsId) : requireStore().relistGoods(userId, goodsId);
+        return storage.route(
+                () -> storage.mysqlStore().relistGoods(userId, goodsId),
+                () -> storage.memoryStore().relistGoods(userId, goodsId)
+        );
     }
 
     @Override
     public void delete(Long userId, Long goodsId) {
-        if (useMysql()) {
-            requirePersistence().deleteGoods(userId, goodsId);
-            return;
-        }
-        requireStore().deleteGoods(userId, goodsId);
-    }
-
-    private boolean useMysql() {
-        return "mysql".equalsIgnoreCase(storageMode);
-    }
-
-    private MarketPersistenceService requirePersistence() {
-        if (persistenceService == null) {
-            throw new IllegalStateException("MySQL persistence service is not available");
-        }
-        return persistenceService;
-    }
-
-    private MarketStore requireStore() {
-        if (marketStore == null) {
-            throw new IllegalStateException("Memory store is not available");
-        }
-        return marketStore;
+        storage.route(
+                () -> storage.mysqlStore().deleteGoods(userId, goodsId),
+                () -> storage.memoryStore().deleteGoods(userId, goodsId)
+        );
     }
 }

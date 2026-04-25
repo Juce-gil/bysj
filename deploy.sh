@@ -37,6 +37,35 @@ error() {
     echo -e "${RED}[ERROR] $1${NC}"
 }
 
+validate_env_file() {
+    local missing_keys=()
+    local placeholder_keys=()
+
+    for key in MYSQL_ROOT_PASSWORD DB_USERNAME DB_PASSWORD JWT_SECRET; do
+        if ! grep -q "^${key}=" .env; then
+            missing_keys+=("${key}")
+        fi
+    done
+
+    if grep -q "^DB_PASSWORD=market_password$" .env || grep -q "^DB_PASSWORD=change_this_password$" .env || grep -q "^DB_PASSWORD=your_secure_password$" .env; then
+        placeholder_keys+=("DB_PASSWORD")
+    fi
+
+    if grep -q "^JWT_SECRET=your-production-jwt-secret-key-2025$" .env || grep -q "^JWT_SECRET=change-this-jwt-secret-key-2025$" .env || grep -q "^JWT_SECRET=your-secure-jwt-secret-key-2025-change-this$" .env; then
+        placeholder_keys+=("JWT_SECRET")
+    fi
+
+    if [ ${#missing_keys[@]} -gt 0 ]; then
+        error ".env 缺少必要配置: ${missing_keys[*]}"
+        exit 1
+    fi
+
+    if [ ${#placeholder_keys[@]} -gt 0 ]; then
+        error ".env 仍包含示例占位值，请先修改: ${placeholder_keys[*]}"
+        exit 1
+    fi
+}
+
 # Step 1: Install Docker
 step "1. Installing Docker..."
 if ! command -v docker &> /dev/null; then
@@ -127,6 +156,9 @@ else
         exit 1
     fi
 fi
+
+step "6.5 Validating .env values..."
+validate_env_file
 
 # Step 8: Build Docker images
 step "7. Building Docker images..."

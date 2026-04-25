@@ -44,4 +44,11 @@ public class NotificationController {
         notificationService.markRead(UserContext.getUserId(), id);
         return ApiResponse.success(true);
     }
+
+    @Operation(summary = "全部标记为已读")
+    @PutMapping("/read-all")
+    public ApiResponse<Boolean> markAllRead() {
+        notificationService.markAllRead(UserContext.getUserId());
+        return ApiResponse.success(true);
+    }
 }

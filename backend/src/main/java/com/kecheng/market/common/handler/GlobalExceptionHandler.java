@@ -64,7 +64,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception exception, HttpServletRequest request) {
         String traceId = TraceContext.getTraceId();
-        String message = "Server error, please contact the administrator and provide traceId=" + (traceId == null ? "-" : traceId);
+        String message = "\u670d\u52a1\u5668\u5f00\u5c0f\u5dee\u4e86\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002"
+                + "\u82e5\u95ee\u9898\u6301\u7eed\u51fa\u73b0\uff0c\u8bf7\u8054\u7cfb\u7ba1\u7406\u5458\u5e76\u63d0\u4f9b\u8ffd\u8e2a\u53f7\uff1a"
+                + (traceId == null ? "-" : traceId);
         recordBusinessFailure(request, 500, "internal_error");
         log.error("Unhandled exception traceId={} method={} path={} message={}",
                 traceId, request.getMethod(), request.getRequestURI(), exception.getMessage(), exception);

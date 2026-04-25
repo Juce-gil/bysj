@@ -1,47 +1,78 @@
-# backend
+# Backend
 
-## 当前实现状态
+校园跳蚤市场后端基于 `Spring Boot 3 + MyBatis-Plus + MySQL`。
 
-- 当前默认启动配置为 **memory** 模式，接口数据由 `com.kecheng.market.common.store.MarketStore` 提供。
-- 现有控制器、服务与返回结构已按统一 `ApiResponse<T>` 组织，首页聚合接口已改为强类型 `HomeDataVo`。
-- 已新增后台管理查询骨架接口：
-  - `GET /api/admin/users`
-  - `GET /api/admin/goods`
-  - `GET /api/admin/announcements`
+## 当前状态
 
-## 默认运行方式
+- 默认运行模式：`mysql`
+- 备用演示模式：`memory`
+- 主业务数据支持 MySQL 持久化
+- 已接入接口测试、单元测试，以及 MySQL/Testcontainers 集成测试
+- 已补充请求追踪、操作日志、全局异常处理和权限边界校验
 
-默认配置位于 `src/main/resources/application.yml`，激活 `memory` profile：
+## 运行方式
 
-- 不依赖 MySQL 即可启动并调试当前接口骨架。
-- `application-memory.yml` 会关闭 DataSource / MyBatis-Plus 自动装配，避免空数据库环境启动失败。
+### 1. 本地启动 MySQL
 
-## 数据库接入预留点
+推荐直接使用项目根目录的 Docker Compose：
 
-已经预留以下结构作为后续真实落库的切入点：
+```powershell
+cd E:\毕设
+docker compose up -d mysql
+```
 
-- MyBatis-Plus 配置：`src/main/java/com/kecheng/market/config/MybatisPlusConfig.java`
-- 实体占位：
-  - `src/main/java/com/kecheng/market/user/entity/UserEntity.java`
-  - `src/main/java/com/kecheng/market/goods/entity/GoodsEntity.java`
-  - `src/main/java/com/kecheng/market/announcement/entity/AnnouncementEntity.java`
-- Mapper 占位：
-  - `src/main/java/com/kecheng/market/user/mapper/UserMapper.java`
-  - `src/main/java/com/kecheng/market/goods/mapper/GoodsMapper.java`
-  - `src/main/java/com/kecheng/market/announcement/mapper/AnnouncementMapper.java`
+### 2. 启动后端
 
-数据库配置已保留在：
+```powershell
+cd E:\毕设\backend
+E:\apache-maven-3.9.12-bin\apache-maven-3.9.12\bin\mvn.cmd -s maven-local-settings.xml spring-boot:run
+```
 
+默认读取：
+
+- `src/main/resources/application.yml`
 - `src/main/resources/application-dev.yml`
-- `src/main/resources/application-prod.yml`
 
-## 后续切换到数据库的推荐步骤
+本地开发默认数据库配置：
 
-1. 以 `User / Goods / Announcement` 三个模块优先落表。
-2. 将 `MarketStore` 中对应查询逻辑逐步迁移到 Mapper + Service 实现。
-3. 优先替换后台分页查询接口，再替换登录、商品列表、公告列表等主链路读取接口。
-4. 待数据库服务实现完成后，再决定是否将 `memory` 模式保留为开发 mock 模式。
+- `DB_URL=jdbc:mysql://127.0.0.1:3306/kecheng_campus_market?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai`
+- `DB_USERNAME=market_user`
+- `DB_PASSWORD=market_password`
 
-## 说明
+### 3. 如需切回内存模式
 
-当前虽然保留了 `market.storage-mode=mysql` 与 MyBatis-Plus 接入点，但**业务服务层仍以内存实现为主**；也就是说，数据库配置已就位，真正的读写切换还需要后续补齐对应 Service 实现。
+```powershell
+E:\apache-maven-3.9.12-bin\apache-maven-3.9.12\bin\mvn.cmd -s maven-local-settings.xml spring-boot:run "-Dspring-boot.run.profiles=memory"
+```
+
+## 测试
+
+运行全部测试：
+
+```powershell
+cd E:\毕设\backend
+E:\apache-maven-3.9.12-bin\apache-maven-3.9.12\bin\mvn.cmd -s maven-local-settings.xml test
+```
+
+说明：
+
+- 普通接口测试默认使用 `memory` profile，速度更快
+- `MysqlPersistenceIntegrationTest` 使用 Testcontainers + MySQL
+- 当前机器如果没有可用 Docker 环境，MySQL 集成测试会自动跳过
+
+## 目录说明
+
+- `src/main/java/com/kecheng/market/common/store/MarketPersistenceService.java`
+  MySQL 持久化主实现
+- `src/main/java/com/kecheng/market/common/store/MarketStore.java`
+  memory 备用实现
+- `src/main/java/com/kecheng/market/common/store/StorageAccessSupport.java`
+  统一收口 storage mode 切换逻辑
+- `src/test/java/com/kecheng/market/MysqlPersistenceIntegrationTest.java`
+  MySQL 持久化集成测试
+
+## 当前建议
+
+- 主线开发继续基于 MySQL 持久化推进
+- `memory` 仅保留为演示或无数据库环境下的备用 profile
+- 若准备部署到服务器，优先检查 `.env`、MySQL 连接和 `JWT_SECRET`

@@ -585,6 +585,17 @@ public class MarketPersistenceService {
         notificationMapper.updateById(entity);
     }
 
+    @Transactional
+    public void markAllNotificationsRead(Long userId) {
+        List<NotificationEntity> notifications = notificationMapper.selectList(Wrappers.<NotificationEntity>lambdaQuery()
+                .eq(NotificationEntity::getUserId, userId)
+                .eq(NotificationEntity::getIsRead, Boolean.FALSE));
+        for (NotificationEntity notification : notifications) {
+            notification.setIsRead(Boolean.TRUE);
+            notificationMapper.updateById(notification);
+        }
+    }
+
     public PageResult<AdminUserListItemVo> pageAdminUsers(AdminUserQuery query) {
         List<AdminUserListItemVo> all = userMapper.selectList(Wrappers.<UserEntity>lambdaQuery().orderByAsc(UserEntity::getId))
                 .stream()

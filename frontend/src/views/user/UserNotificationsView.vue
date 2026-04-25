@@ -8,16 +8,17 @@
       </article>
     </section>
 
-    <SectionCard title="我的通知" subtitle="集中查看交易提醒、公告动态与系统消息，并支持在用户中心内快速联动跳转。">
+    <SectionCard title="我的通知" subtitle="集中查看交易提醒、公告动态与系统消息，支持筛选、批量已读和跳转到对应页面。">
       <template #extra>
         <div class="toolbar">
           <el-select v-model="typeFilter" placeholder="消息类型" class="toolbar-select">
             <el-option label="全部类型" value="" />
-            <el-option label="交易消息" value="trade" />
-            <el-option label="公告消息" value="announcement" />
-            <el-option label="系统消息" value="system" />
+            <el-option label="交易提醒" value="trade" />
+            <el-option label="公告通知" value="announcement" />
+            <el-option label="系统通知" value="system" />
           </el-select>
           <el-switch v-model="unreadOnly" inline-prompt active-text="仅未读" inactive-text="全部" />
+          <el-button text :disabled="!unreadCount" :loading="markingAllRead" @click="handleMarkAllRead">全部已读</el-button>
           <el-button text :loading="loading" @click="loadNotifications">刷新</el-button>
         </div>
       </template>
@@ -26,17 +27,17 @@
         <article>
           <span>当前筛选</span>
           <strong>{{ currentFilterSummary }}</strong>
-          <p>可按消息类型与已读状态快速定位内容</p>
+          <p>按消息类型和已读状态快速定位需要处理的内容。</p>
         </article>
         <article>
           <span>未读消息</span>
           <strong>{{ unreadCount }}</strong>
-          <p>优先处理交易相关或待确认提醒</p>
+          <p>建议优先处理交易提醒和待确认通知。</p>
         </article>
         <article>
-          <span>展示结果</span>
+          <span>显示结果</span>
           <strong>{{ filteredNotifications.length }}</strong>
-          <p>{{ notifications.length ? '当前列表已接入真实通知接口' : '暂时还没有收到新的通知' }}</p>
+          <p>{{ notifications.length ? '当前列表已接入真实通知接口。' : '暂时还没有收到新的通知。' }}</p>
         </article>
       </div>
 
@@ -82,14 +83,14 @@
             >
               {{ getNotificationActionLabel(item.type) }}
             </el-button>
-            <span v-else class="subtle-text">该通知当前没有可跳转的详情页面</span>
+            <span v-else class="subtle-text">该通知当前没有可跳转的详情页面。</span>
           </div>
         </article>
       </div>
       <EmptyHint
         v-else
         :title="notifications.length ? '没有符合条件的通知' : '暂时没有通知消息'"
-        :description="notifications.length ? '可以切换筛选条件，查看其它类型或已读状态的消息。' : '新的交易提醒、公告或系统消息到来后，会第一时间汇总到这里。'"
+        :description="notifications.length ? '可以切换筛选条件，查看其他类型或已读状态的消息。' : '新的交易提醒、公告或系统消息到来后，会第一时间汇总到这里。'"
       />
     </SectionCard>
   </div>
@@ -101,18 +102,26 @@ import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import SectionCard from '@/components/SectionCard.vue';
 import EmptyHint from '@/components/EmptyHint.vue';
-import { getNotifications, getUnreadNotificationCount, markNotificationRead, type NotificationItem } from '@/api/marketplace';
+import {
+  getNotifications,
+  getUnreadNotificationCount,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type NotificationItem,
+} from '@/api/marketplace';
 import {
   getNotificationActionLabel,
   getNotificationTypeMeta,
   isTradeNotification,
   resolveNotificationTarget,
 } from '@/utils/notification';
+import { extractErrorMessage } from '@/utils/error';
 
 const router = useRouter();
 const notifications = ref<NotificationItem[]>([]);
 const unreadCount = ref(0);
 const loading = ref(false);
+const markingAllRead = ref(false);
 const errorMessage = ref('');
 const unreadOnly = ref(false);
 const typeFilter = ref('');
@@ -122,10 +131,10 @@ const stats = computed(() => {
   const announcementCount = notifications.value.filter((item) => item.type === 'announcement').length;
   const tradeCount = notifications.value.filter((item) => isTradeNotification(item.type)).length;
   return [
-    { label: '通知总数', value: String(notifications.value.length).padStart(2, '0'), tip: '展示当前所有通知消息' },
-    { label: '未读消息', value: String(unreadCount.value).padStart(2, '0'), tip: '帮助你快速跟进待处理内容' },
-    { label: '交易提醒', value: String(tradeCount).padStart(2, '0'), tip: '通常关联预约、商品或求购流程' },
-    { label: '公告动态', value: String(announcementCount).padStart(2, '0'), tip: '便于及时查看平台公告' },
+    { label: '通知总数', value: String(notifications.value.length).padStart(2, '0'), tip: '当前账号收到的全部通知数量' },
+    { label: '未读消息', value: String(unreadCount.value).padStart(2, '0'), tip: '建议优先处理待跟进的消息' },
+    { label: '交易提醒', value: String(tradeCount).padStart(2, '0'), tip: '收藏、评论、预约等交易相关通知' },
+    { label: '公告通知', value: String(announcementCount).padStart(2, '0'), tip: '平台公告和系统动态提醒' },
   ];
 });
 
@@ -134,30 +143,26 @@ const filteredNotifications = computed(() =>
     if (unreadOnly.value && item.isRead) {
       return false;
     }
-
     if (typeFilter.value === 'trade') {
       return isTradeNotification(item.type);
     }
-
     if (typeFilter.value === 'announcement') {
       return item.type === 'announcement';
     }
-
     if (typeFilter.value === 'system') {
       return !isTradeNotification(item.type) && item.type !== 'announcement';
     }
-
     return true;
   }),
 );
 
 const currentFilterSummary = computed(() => {
   const parts: string[] = [];
-  if (typeFilter.value === 'trade') parts.push('交易消息');
-  if (typeFilter.value === 'announcement') parts.push('公告消息');
-  if (typeFilter.value === 'system') parts.push('系统消息');
+  if (typeFilter.value === 'trade') parts.push('交易提醒');
+  if (typeFilter.value === 'announcement') parts.push('公告通知');
+  if (typeFilter.value === 'system') parts.push('系统通知');
   if (unreadOnly.value) parts.push('仅未读');
-  return parts.join(' · ') || '显示全部通知';
+  return parts.join(' / ') || '显示全部通知';
 });
 
 const isPending = (id: number) => pendingIds.value.includes(id);
@@ -170,11 +175,17 @@ const syncReadState = (id: number) => {
   }
 };
 
+const markAllLocalRead = () => {
+  notifications.value.forEach((item) => {
+    item.isRead = true;
+  });
+  unreadCount.value = 0;
+};
+
 const runWithPending = async (id: number, task: () => Promise<void>) => {
   if (isPending(id)) {
     return;
   }
-
   pendingIds.value = [...pendingIds.value, id];
   try {
     await task();
@@ -187,12 +198,31 @@ const handleMarkRead = async (item: NotificationItem) => {
   if (item.isRead) {
     return;
   }
-
   await runWithPending(item.id, async () => {
-    await markNotificationRead(item.id);
-    syncReadState(item.id);
-    ElMessage.success('通知已标记为已读');
+    try {
+      await markNotificationRead(item.id);
+      syncReadState(item.id);
+      ElMessage.success('通知已标记为已读');
+    } catch (error) {
+      ElMessage.error(extractErrorMessage(error, '标记通知失败，请稍后重试'));
+    }
   });
+};
+
+const handleMarkAllRead = async () => {
+  if (!unreadCount.value || markingAllRead.value) {
+    return;
+  }
+  markingAllRead.value = true;
+  try {
+    await markAllNotificationsRead();
+    markAllLocalRead();
+    ElMessage.success('全部通知已标记为已读');
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '批量标记已读失败，请稍后重试'));
+  } finally {
+    markingAllRead.value = false;
+  }
 };
 
 const handleOpenNotification = async (item: NotificationItem) => {
@@ -201,29 +231,30 @@ const handleOpenNotification = async (item: NotificationItem) => {
     ElMessage.info('当前通知暂时没有可跳转的目标页面');
     return;
   }
-
   await runWithPending(item.id, async () => {
-    if (!item.isRead) {
-      await markNotificationRead(item.id);
-      syncReadState(item.id);
+    try {
+      if (!item.isRead) {
+        await markNotificationRead(item.id);
+        syncReadState(item.id);
+      }
+      await router.push(target);
+    } catch (error) {
+      ElMessage.error(extractErrorMessage(error, '打开通知详情失败，请稍后重试'));
     }
-    await router.push(target);
   });
 };
 
 const loadNotifications = async () => {
   loading.value = true;
   errorMessage.value = '';
-
   try {
     const [list, unread] = await Promise.all([getNotifications(), getUnreadNotificationCount()]);
     notifications.value = list;
     unreadCount.value = unread;
   } catch (error) {
-    console.error('加载通知列表失败', error);
     notifications.value = [];
     unreadCount.value = 0;
-    errorMessage.value = '通知列表暂时不可用，请稍后重新尝试。';
+    errorMessage.value = extractErrorMessage(error, '通知列表暂时不可用，请稍后重试。');
   } finally {
     loading.value = false;
   }
@@ -237,7 +268,7 @@ onMounted(loadNotifications);
 .stat-card span { color: var(--qh-text-secondary); }
 .stat-card strong { display: block; margin: 14px 0 10px; font-size: 30px; color: var(--qh-primary-deep); }
 .stat-card p { margin: 0; color: var(--qh-text-secondary); }
-.toolbar { display: flex; align-items: center; gap: 12px; }
+.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .toolbar-select { width: 180px; }
 .notifications-summary {
   margin-bottom: 18px;
@@ -272,7 +303,7 @@ onMounted(loadNotifications);
 }
 
 @media (max-width: 960px) {
-  .toolbar { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+  .toolbar { width: 100%; justify-content: flex-end; }
   .toolbar-select { width: 100%; }
   .notification-card__head { flex-direction: column; }
 }

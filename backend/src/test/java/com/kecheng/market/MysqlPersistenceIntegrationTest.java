@@ -12,6 +12,7 @@ import com.kecheng.market.favorite.entity.FavoriteEntity;
 import com.kecheng.market.favorite.mapper.FavoriteMapper;
 import com.kecheng.market.goods.entity.GoodsEntity;
 import com.kecheng.market.goods.mapper.GoodsMapper;
+import com.kecheng.market.notification.entity.NotificationEntity;
 import com.kecheng.market.notification.mapper.NotificationMapper;
 import com.kecheng.market.support.AbstractMysqlApiIntegrationTest;
 import com.kecheng.market.user.entity.UserEntity;
@@ -21,6 +22,8 @@ import com.kecheng.market.wanted.mapper.WantedMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -226,5 +229,211 @@ class MysqlPersistenceIntegrationTest extends AbstractMysqlApiIntegrationTest {
         assertThat(announcement.getTop()).isTrue();
         assertThat(announcement.getTitle()).isEqualTo("Mysql Admin Announcement");
         assertThat(announcement.getPublishedAt()).isNotNull();
+    }
+
+    @Test
+    void adminUserDisableAndRecoveryPersistInMysql() throws Exception {
+        String adminToken = loginAndGetToken("admin");
+
+        putJson("/api/admin/users/2/status", adminToken, Map.of("disabled", true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(2))
+                .andExpect(jsonPath("$.data.disabled").value(true));
+
+        UserEntity disabledUser = userMapper.selectById(2L);
+        assertThat(disabledUser).isNotNull();
+        assertThat(disabledUser.getStatus()).isEqualTo("disabled");
+
+        postJson("/api/auth/login", Map.of(
+                "username", "zhangsan",
+                "password", "123456"
+        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(403));
+
+        putJson("/api/admin/users/2/status", adminToken, Map.of("disabled", false))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(2))
+                .andExpect(jsonPath("$.data.disabled").value(false));
+
+        UserEntity recoveredUser = userMapper.selectById(2L);
+        assertThat(recoveredUser).isNotNull();
+        assertThat(recoveredUser.getStatus()).isEqualTo("normal");
+
+        postJson("/api/auth/login", Map.of(
+                "username", "zhangsan",
+                "password", "123456"
+        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.token").isNotEmpty());
+    }
+
+    @Test
+    void adminGoodsModerationPersistsInMysql() throws Exception {
+        String adminToken = loginAndGetToken("admin");
+        String sellerToken = loginAndGetToken("zhangsan");
+
+        long goodsId = responseDataId(postJson("/api/goods", sellerToken, Map.of(
+                "title", "Mysql Admin Review Headset",
+                "price", new BigDecimal("79.90"),
+                "originalPrice", new BigDecimal("139.00"),
+                "category", DIGITAL_CATEGORY,
+                "campus", "East Campus",
+                "condition", "Good",
+                "intro", "Created for mysql admin moderation coverage.",
+                "description", "This listing should survive admin moderation assertions.",
+                "tags", List.of("mysql", "admin"),
+                "imageUrls", List.of("/uploads/goods/mysql-admin-headset.png")
+        )));
+
+        putNoBody("/api/admin/goods/" + goodsId + "/off-shelf", adminToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.status").value("off_shelf"));
+
+        GoodsEntity offShelfGoods = goodsMapper.selectById(goodsId);
+        assertThat(offShelfGoods).isNotNull();
+        assertThat(offShelfGoods.getStatus()).isEqualTo("off_shelf");
+
+        putNoBody("/api/admin/goods/" + goodsId + "/relist", adminToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.status").value("on_sale"));
+
+        GoodsEntity relistedGoods = goodsMapper.selectById(goodsId);
+        assertThat(relistedGoods).isNotNull();
+        assertThat(relistedGoods.getStatus()).isEqualTo("on_sale");
+
+        deleteJson("/api/admin/goods/" + goodsId, adminToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").value(true));
+
+        assertThat(goodsMapper.selectById(goodsId)).isNull();
+    }
+
+    @Test
+    void homeAggregationEndpointUsesMysqlBackedData() throws Exception {
+        String adminToken = loginAndGetToken("admin");
+        String sellerToken = loginAndGetToken("zhangsan");
+
+        long goodsId = responseDataId(postJson("/api/goods", sellerToken, Map.of(
+                "title", "Mysql Home Speaker",
+                "price", new BigDecimal("66.00"),
+                "originalPrice", new BigDecimal("129.00"),
+                "category", DIGITAL_CATEGORY,
+                "campus", "Main Campus",
+                "condition", "Almost new",
+                "intro", "Appears in mysql home aggregation.",
+                "description", "Created to verify /api/home under mysql mode.",
+                "tags", List.of("home", "mysql"),
+                "imageUrls", List.of("/uploads/goods/mysql-home-speaker.png")
+        )));
+
+        long wantedId = responseDataId(postJson("/api/wanted", sellerToken, Map.of(
+                "title", "Mysql Home Book Wanted",
+                "budget", "Budget around 60",
+                "category", BOOK_CATEGORY,
+                "campus", "Main Campus",
+                "deadline", "2026-08-01",
+                "intro", "Looking for a clean second-hand book.",
+                "description", "Created to verify mysql home aggregation.",
+                "tags", List.of("home", "wanted"),
+                "imageUrls", List.of("/uploads/wanted/mysql-home-book.png")
+        )));
+
+        long announcementId = responseDataId(postJson("/api/admin/announcements", adminToken, Map.of(
+                "title", "Mysql Home Announcement",
+                "summary", "Visible on home page",
+                "content", "This announcement verifies mysql-backed home aggregation.",
+                "level", "notice",
+                "top", false,
+                "published", false
+        )));
+
+        putNoBody("/api/admin/announcements/" + announcementId + "/publish", adminToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.published").value(true));
+
+        JsonNode homeData = responseData(getJson("/api/home")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200)));
+
+        assertThat(homeData.path("stats").size()).isEqualTo(4);
+        assertThat(homeData.path("featuredGoods").isArray()).isTrue();
+        assertThat(homeData.path("hotWanted").isArray()).isTrue();
+        assertThat(homeData.path("latestAnnouncements").isArray()).isTrue();
+        assertThat(homeData.path("banners").isArray()).isTrue();
+        assertThat(containsNode(homeData.path("featuredGoods"), item -> item.path("id").asLong() == goodsId)).isTrue();
+        assertThat(containsNode(homeData.path("hotWanted"), item -> item.path("id").asLong() == wantedId)).isTrue();
+        assertThat(containsNode(homeData.path("latestAnnouncements"), item -> item.path("id").asLong() == announcementId)).isTrue();
+    }
+
+    @Test
+    void markAllNotificationsReadPersistsInMysql() throws Exception {
+        String sellerToken = loginAndGetToken("zhangsan");
+        String buyerToken = loginAndGetToken("lisi");
+
+        long goodsId = responseDataId(postJson("/api/goods", sellerToken, Map.of(
+                "title", "Mysql Notification Keyboard",
+                "price", new BigDecimal("59.00"),
+                "originalPrice", new BigDecimal("119.00"),
+                "category", DIGITAL_CATEGORY,
+                "campus", "North Campus",
+                "condition", "Good",
+                "intro", "Used to verify notification read-all persistence.",
+                "description", "This listing exists only for notification integration coverage.",
+                "tags", List.of("notification", "mysql"),
+                "imageUrls", List.of("/uploads/goods/mysql-notification-keyboard.png")
+        )));
+
+        postNoBody("/api/goods/" + goodsId + "/favorite", buyerToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        postJson("/api/comments", buyerToken, Map.of(
+                "goodsId", goodsId,
+                "content", "Trigger unread notification coverage."
+        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        long unreadBefore = responseData(getJson("/api/notifications/unread-count", sellerToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200)))
+                .asLong();
+        assertThat(unreadBefore).isGreaterThan(0L);
+
+        List<NotificationEntity> unreadNotifications = notificationMapper.selectList(Wrappers.<NotificationEntity>lambdaQuery()
+                .eq(NotificationEntity::getUserId, 2L)
+                .eq(NotificationEntity::getIsRead, Boolean.FALSE));
+        Set<Long> unreadIds = unreadNotifications.stream()
+                .map(NotificationEntity::getId)
+                .collect(Collectors.toSet());
+        assertThat(unreadIds).isNotEmpty();
+
+        putNoBody("/api/notifications/read-all", sellerToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").value(true));
+
+        long unreadAfter = responseData(getJson("/api/notifications/unread-count", sellerToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200)))
+                .asLong();
+        assertThat(unreadAfter).isZero();
+
+        long unreadCountInDb = notificationMapper.selectCount(Wrappers.<NotificationEntity>lambdaQuery()
+                .eq(NotificationEntity::getUserId, 2L)
+                .eq(NotificationEntity::getIsRead, Boolean.FALSE));
+        assertThat(unreadCountInDb).isZero();
+
+        List<NotificationEntity> markedNotifications = notificationMapper.selectBatchIds(unreadIds);
+        assertThat(markedNotifications).isNotEmpty();
+        assertThat(markedNotifications).allSatisfy(item -> assertThat(item.getIsRead()).isTrue());
     }
 }

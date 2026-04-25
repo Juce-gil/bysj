@@ -5,6 +5,7 @@ import com.kecheng.market.common.exception.UnauthorizedException;
 import com.kecheng.market.common.log.TraceContext;
 import com.kecheng.market.common.store.MarketPersistenceService;
 import com.kecheng.market.common.store.MarketStore;
+import com.kecheng.market.common.store.StorageAccessSupport;
 import com.kecheng.market.security.annotation.AnonymousAccess;
 import com.kecheng.market.security.annotation.RequireAdmin;
 import com.kecheng.market.security.annotation.RequireLogin;
@@ -31,9 +32,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
     private final JwtProperties jwtProperties;
-    private final String storageMode;
-    private final MarketStore marketStore;
-    private final MarketPersistenceService persistenceService;
+    private final StorageAccessSupport storage;
 
     public JwtAuthInterceptor(
             JwtUtil jwtUtil,
@@ -43,9 +42,11 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             ObjectProvider<MarketPersistenceService> persistenceServiceProvider) {
         this.jwtUtil = jwtUtil;
         this.jwtProperties = jwtProperties;
-        this.storageMode = storageMode;
-        this.marketStore = marketStoreProvider.getIfAvailable();
-        this.persistenceService = persistenceServiceProvider.getIfAvailable();
+        this.storage = new StorageAccessSupport(
+                storageMode,
+                marketStoreProvider.getIfAvailable(),
+                persistenceServiceProvider.getIfAvailable()
+        );
     }
 
     @Override
@@ -82,10 +83,10 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return true;
         }
         if (UserContext.get() == null) {
-            throw new UnauthorizedException("Please login before accessing this endpoint");
+            throw new UnauthorizedException("\u8bf7\u5148\u767b\u5f55\u540e\u518d\u8bbf\u95ee\u8be5\u63a5\u53e3");
         }
         if (accessPolicy == AccessPolicy.ADMIN && !"admin".equalsIgnoreCase(UserContext.getRole())) {
-            throw new ForbiddenException("This endpoint is only available to administrators");
+            throw new ForbiddenException("\u5f53\u524d\u63a5\u53e3\u4ec5\u7ba1\u7406\u5458\u53ef\u8bbf\u95ee");
         }
         return true;
     }
@@ -109,34 +110,34 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
     }
 
     private LoginUser refreshLoginUser(LoginUser tokenUser) {
-        if (useMysql()) {
+        if (storage.useMysql()) {
             try {
-                var currentUser = requirePersistence().findUserByUsernameOrStudentNo(tokenUser.username());
+                var currentUser = storage.mysqlStore().findUserByUsernameOrStudentNo(tokenUser.username());
                 if (!currentUser.getId().equals(tokenUser.userId())) {
-                    throw new UnauthorizedException("Login session is no longer valid");
+                    throw new UnauthorizedException("\u767b\u5f55\u72b6\u6001\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55");
                 }
                 if ("disabled".equalsIgnoreCase(currentUser.getStatus())) {
-                    throw new ForbiddenException("Account has been disabled");
+                    throw new ForbiddenException("\u8d26\u53f7\u5df2\u88ab\u7981\u7528");
                 }
                 return new LoginUser(currentUser.getId(), currentUser.getUsername(), currentUser.getRealName(), currentUser.getRole());
             } catch (UnauthorizedException | ForbiddenException exception) {
                 throw exception;
             } catch (RuntimeException exception) {
-                throw new UnauthorizedException("Login session is no longer valid");
+                throw new UnauthorizedException("\u767b\u5f55\u72b6\u6001\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55");
             }
         }
 
         MarketStore.UserData currentUser;
         try {
-            currentUser = requireStore().findUserByUsernameOrStudentNo(tokenUser.username());
+            currentUser = storage.memoryStore().findUserByUsernameOrStudentNo(tokenUser.username());
         } catch (RuntimeException exception) {
-            throw new UnauthorizedException("Login session is no longer valid");
+            throw new UnauthorizedException("\u767b\u5f55\u72b6\u6001\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55");
         }
         if (!currentUser.id.equals(tokenUser.userId())) {
-            throw new UnauthorizedException("Login session is no longer valid");
+            throw new UnauthorizedException("\u767b\u5f55\u72b6\u6001\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55");
         }
         if (currentUser.disabled) {
-            throw new ForbiddenException("Account has been disabled");
+            throw new ForbiddenException("\u8d26\u53f7\u5df2\u88ab\u7981\u7528");
         }
         return new LoginUser(currentUser.id, currentUser.username, currentUser.name, currentUser.role);
     }
@@ -155,7 +156,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
 
         if (anonymous && (requireLogin || requireAdmin)) {
             log.error("Conflicting access policy on {}#{}", handlerMethod.getBeanType().getSimpleName(), handlerMethod.getMethod().getName());
-            throw new ForbiddenException("Conflicting access policy configuration");
+            throw new ForbiddenException("\u63a5\u53e3\u6743\u9650\u914d\u7f6e\u51b2\u7a81");
         }
         if (anonymous) {
             return AccessPolicy.ANONYMOUS;
@@ -171,7 +172,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
                 handlerMethod.getBeanType().getSimpleName(),
                 handlerMethod.getMethod().getName(),
                 request.getRequestURI());
-        throw new ForbiddenException("This endpoint is not accessible");
+        throw new ForbiddenException("\u5f53\u524d\u63a5\u53e3\u672a\u5f00\u653e\u8bbf\u95ee");
     }
 
     private boolean isAdminPath(HttpServletRequest request) {
@@ -185,24 +186,6 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return operation.summary();
         }
         return handlerMethod.getBeanType().getSimpleName() + "#" + handlerMethod.getMethod().getName();
-    }
-
-    private boolean useMysql() {
-        return "mysql".equalsIgnoreCase(storageMode);
-    }
-
-    private MarketStore requireStore() {
-        if (marketStore == null) {
-            throw new IllegalStateException("Memory store is not available");
-        }
-        return marketStore;
-    }
-
-    private MarketPersistenceService requirePersistence() {
-        if (persistenceService == null) {
-            throw new IllegalStateException("MySQL persistence service is not available");
-        }
-        return persistenceService;
     }
 
     private enum AccessPolicy {

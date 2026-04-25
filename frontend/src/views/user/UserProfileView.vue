@@ -17,24 +17,24 @@
         type="success"
         show-icon
         :closable="false"
-        title="当前页面已联调 /api/users/me 查询接口与 PUT /api/users/me 更新接口，可直接维护电话、QQ 与个性签名。"
+        title="当前页面已联调 /api/users/me 查询接口与 PUT /api/users/me 更新接口，可直接维护电话、QQ 和个性签名。"
       />
 
       <div class="profile-summary-bar qh-panel--subtle">
         <article>
           <span>当前角色</span>
           <strong>{{ userStore.role === 'admin' ? '管理员' : '普通用户' }}</strong>
-          <p>展示当前登录账号的身份状态</p>
+          <p>展示当前登录账号的身份状态。</p>
         </article>
         <article>
           <span>编辑状态</span>
           <strong>{{ hasChanges ? '待保存' : '已同步' }}</strong>
-          <p>{{ hasChanges ? '你有未保存的资料修改' : '当前表单内容已与服务器同步' }}</p>
+          <p>{{ hasChanges ? '你有尚未保存的资料修改。' : '当前表单内容已与服务器同步。' }}</p>
         </article>
         <article>
           <span>所属学校</span>
           <strong>{{ form.school || '未设置学校' }}</strong>
-          <p>学校字段来自账号资料，可用于前后台统一展示</p>
+          <p>学校字段来自账号资料，可用于前后台统一展示。</p>
         </article>
       </div>
 
@@ -102,7 +102,7 @@
             <ul>
               <li><strong>读取资料：</strong>进入页面时调用 <code>/api/users/me</code> 获取当前账号数据。</li>
               <li><strong>更新资料：</strong>点击保存后调用 <code>PUT /api/users/me</code> 提交修改内容。</li>
-              <li><strong>联系方式：</strong>电话与 QQ 可用于商品交易和求购沟通展示。</li>
+              <li><strong>联系方式：</strong>电话和 QQ 可用于商品交易与求购沟通展示。</li>
             </ul>
           </div>
         </div>
@@ -117,6 +117,7 @@ import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import SectionCard from '@/components/SectionCard.vue';
 import { useUserStore } from '@/stores/user';
+import { extractErrorMessage } from '@/utils/error';
 
 const userStore = useUserStore();
 const formRef = ref<FormInstance>();
@@ -140,7 +141,7 @@ const stats = computed(() => [
   { label: '账号角色', value: userStore.role === 'admin' ? 'AD' : 'US', tip: '支持前后台角色切换展示' },
   { label: '所属学校', value: form.school || '未设置', tip: '展示当前账号绑定学校' },
   { label: '同步状态', value: hasChanges.value ? 'EDIT' : 'SYNC', tip: hasChanges.value ? '存在待保存修改' : '表单内容已同步' },
-  { label: '联系方式', value: form.phone ? '已填写' : '待完善', tip: '电话与 QQ 可用于交易联系' },
+  { label: '联系方式', value: form.phone ? '已填写' : '待完善', tip: '电话和 QQ 可用于交易联系' },
 ]);
 
 const rules: FormRules = {
@@ -182,7 +183,7 @@ const loadProfile = async () => {
     formRef.value?.clearValidate();
   } catch (error) {
     console.error('加载用户资料失败', error);
-    errorMessage.value = '用户资料暂时无法加载，请稍后重试。';
+    errorMessage.value = extractErrorMessage(error, '用户资料暂时无法加载，请稍后重试。');
   } finally {
     loading.value = false;
   }
@@ -221,7 +222,7 @@ const handleSave = async () => {
     ElMessage.success('个人资料已更新');
   } catch (error) {
     console.error('保存用户资料失败', error);
-    ElMessage.error('保存失败，请稍后重试');
+    ElMessage.error(extractErrorMessage(error, '保存失败，请稍后重试'));
   } finally {
     saving.value = false;
   }

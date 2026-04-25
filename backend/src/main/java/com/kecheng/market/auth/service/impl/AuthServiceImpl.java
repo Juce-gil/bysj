@@ -7,6 +7,7 @@ import com.kecheng.market.auth.vo.LoginResponse;
 import com.kecheng.market.common.exception.BusinessException;
 import com.kecheng.market.common.store.MarketPersistenceService;
 import com.kecheng.market.common.store.MarketStore;
+import com.kecheng.market.common.store.StorageAccessSupport;
 import com.kecheng.market.security.model.LoginUser;
 import com.kecheng.market.security.util.JwtUtil;
 import com.kecheng.market.user.entity.UserEntity;
@@ -18,9 +19,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    private final String storageMode;
-    private final MarketStore marketStore;
-    private final MarketPersistenceService persistenceService;
+    private final StorageAccessSupport storage;
     private final JwtUtil jwtUtil;
 
     public AuthServiceImpl(
@@ -28,35 +27,37 @@ public class AuthServiceImpl implements AuthService {
             ObjectProvider<MarketStore> marketStoreProvider,
             ObjectProvider<MarketPersistenceService> persistenceServiceProvider,
             JwtUtil jwtUtil) {
-        this.storageMode = storageMode;
-        this.marketStore = marketStoreProvider.getIfAvailable();
-        this.persistenceService = persistenceServiceProvider.getIfAvailable();
+        this.storage = new StorageAccessSupport(
+                storageMode,
+                marketStoreProvider.getIfAvailable(),
+                persistenceServiceProvider.getIfAvailable()
+        );
         this.jwtUtil = jwtUtil;
     }
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        if (useMysql()) {
-            UserEntity user = requirePersistence().findUserByUsernameOrStudentNo(request.username());
+        if (storage.useMysql()) {
+            UserEntity user = storage.mysqlStore().findUserByUsernameOrStudentNo(request.username());
             if ("disabled".equalsIgnoreCase(user.getStatus())) {
-                throw new BusinessException(403, "Account is disabled");
+                throw new BusinessException(403, "\u8d26\u53f7\u5df2\u88ab\u7981\u7528");
             }
             if (!user.getPassword().equals(request.password())) {
-                throw new BusinessException(400, "Account or password is incorrect");
+                throw new BusinessException(400, "\u8d26\u53f7\u6216\u5bc6\u7801\u9519\u8bef");
             }
-            UserProfileVo profile = requirePersistence().getUserProfile(user.getId());
+            UserProfileVo profile = storage.mysqlStore().getUserProfile(user.getId());
             String token = jwtUtil.generateToken(new LoginUser(user.getId(), user.getUsername(), user.getRealName(), user.getRole()));
             return new LoginResponse(token, profile);
         }
 
-        MarketStore.UserData user = requireStore().findUserByUsernameOrStudentNo(request.username());
+        MarketStore.UserData user = storage.memoryStore().findUserByUsernameOrStudentNo(request.username());
         if (user.disabled) {
-            throw new BusinessException(403, "Account is disabled");
+            throw new BusinessException(403, "\u8d26\u53f7\u5df2\u88ab\u7981\u7528");
         }
         if (!user.password.equals(request.password())) {
-            throw new BusinessException(400, "Account or password is incorrect");
+            throw new BusinessException(400, "\u8d26\u53f7\u6216\u5bc6\u7801\u9519\u8bef");
         }
-        UserProfileVo profile = requireStore().getUserProfile(user.id);
+        UserProfileVo profile = storage.memoryStore().getUserProfile(user.id);
         String token = jwtUtil.generateToken(new LoginUser(user.id, user.username, user.name, user.role));
         return new LoginResponse(token, profile);
     }
@@ -64,32 +65,14 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public UserProfileVo register(RegisterRequest request) {
         if (!request.password().equals(request.confirmPassword())) {
-            throw new BusinessException(400, "Passwords do not match");
+            throw new BusinessException(400, "\u4e24\u6b21\u8f93\u5165\u7684\u5bc6\u7801\u4e0d\u4e00\u81f4");
         }
-        if (useMysql()) {
-            return requirePersistence().registerUser(request.username(), request.password(), request.nickname());
+        if (storage.useMysql()) {
+            return storage.mysqlStore().registerUser(request.username(), request.password(), request.nickname());
         }
         long timestamp = System.currentTimeMillis();
         String studentNo = "KC" + timestamp;
         String phone = "13" + String.format("%09d", timestamp % 1_000_000_000L);
-        return requireStore().registerUser(request.username(), request.password(), request.nickname(), studentNo, phone);
-    }
-
-    private boolean useMysql() {
-        return "mysql".equalsIgnoreCase(storageMode);
-    }
-
-    private MarketPersistenceService requirePersistence() {
-        if (persistenceService == null) {
-            throw new IllegalStateException("MySQL persistence service is not available");
-        }
-        return persistenceService;
-    }
-
-    private MarketStore requireStore() {
-        if (marketStore == null) {
-            throw new IllegalStateException("Memory store is not available");
-        }
-        return marketStore;
+        return storage.memoryStore().registerUser(request.username(), request.password(), request.nickname(), studentNo, phone);
     }
 }

@@ -449,6 +449,11 @@ export const markNotificationRead = async (id: number): Promise<boolean> => {
   return response.data;
 };
 
+export const markAllNotificationsRead = async (): Promise<boolean> => {
+  const response = await http.put('/notifications/read-all') as ApiResponse<boolean>;
+  return response.data;
+};
+
 export const updateGoodsPost = async (id: number, payload: CreateGoodsPayload): Promise<GoodsItem> => {
   const response = await http.put(`/goods/${id}`, payload) as ApiResponse<unknown>;
   return normalizeGoodsItem(response.data);

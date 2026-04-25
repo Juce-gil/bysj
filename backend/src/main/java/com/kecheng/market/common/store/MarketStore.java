@@ -683,6 +683,19 @@ public class MarketStore {
         this.persistSnapshotQuietly();
     }
 
+    public void markAllNotificationsRead(Long userId) {
+        boolean changed = false;
+        for (NotificationData notificationData : this.notificationsByUser.getOrDefault(userId, List.<NotificationData>of())) {
+            if (!notificationData.read) {
+                notificationData.read = true;
+                changed = true;
+            }
+        }
+        if (changed) {
+            this.persistSnapshotQuietly();
+        }
+    }
+
     public PageResult<AdminUserListItemVo> pageAdminUsers(String keyword, String role, Boolean disabled, Long pageNum, Long pageSize) {
         List<AdminUserListItemVo> result = this.users.values().stream()
                 .filter(item -> !item.deleted)
