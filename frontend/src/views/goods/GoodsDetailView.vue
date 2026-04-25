@@ -153,7 +153,7 @@
 
       <el-dialog v-model="appointmentVisible" title="发起预约" width="520px" @closed="resetAppointmentForm">
         <div class="appointment-form">
-          <el-date-picker v-model="appointmentForm.intendedTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="请选择意向交易时间" style="width: 100%;" />
+          <el-date-picker v-model="appointmentForm.intendedTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="请选择意向交易时间" style="width: 100%;" />
           <el-input v-model="appointmentForm.intendedLocation" maxlength="100" placeholder="请输入意向交易地点" />
           <el-input v-model="appointmentForm.remark" type="textarea" :rows="4" maxlength="200" show-word-limit placeholder="可填写补充说明，如希望验机、面交时间段等。" />
         </div>
@@ -180,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { RouterLink, useRoute } from 'vue-router';
 import EmptyHint from '@/components/EmptyHint.vue';
@@ -228,9 +228,11 @@ const detailGalleryImages = computed(() => {
 });
 const activeImageUrl = computed(() => detailGalleryImages.value[currentImageIndex.value] || detail.value?.coverImageUrl || '');
 const detailCoverBackground = computed(() => buildCoverBackground(detail.value?.coverStyle || DETAIL_IMAGE_FALLBACK, activeImageUrl.value));
-const canAppointment = computed(() => detail.value?.status === 'on_sale');
+const isOwnGoods = computed(() => Boolean(detail.value && userStore.profile?.id && detail.value.sellerId === userStore.profile.id));
+const canAppointment = computed(() => detail.value?.status === 'on_sale' && !isOwnGoods.value);
 const appointmentButtonText = computed(() => {
   if (!detail.value) return '发起预约';
+  if (isOwnGoods.value) return '这是你发布的商品';
   return detail.value.status === 'on_sale' ? '发起预约' : `当前${statusMeta.value.text}`;
 });
 
@@ -313,8 +315,12 @@ const openAppointmentDialog = () => {
     ElMessage.warning('请先登录后再发起预约');
     return;
   }
+  if (isOwnGoods.value) {
+    ElMessage.info('不能预约自己发布的商品');
+    return;
+  }
   if (detail.value?.status !== 'on_sale') {
-    ElMessage.warning('当前商品暂时无法预约');
+    ElMessage.warning(`当前商品状态为${statusMeta.value.text}，暂时不能预约`);
     return;
   }
   appointmentVisible.value = true;
@@ -345,7 +351,11 @@ const submitAppointment = async () => {
   }
 };
 
-onMounted(loadData);
+watch(() => route.params.id, () => {
+  appointmentSuccessMessage.value = '';
+  resetAppointmentForm();
+  loadData();
+}, { immediate: true });
 </script>
 
 <style scoped lang="scss">

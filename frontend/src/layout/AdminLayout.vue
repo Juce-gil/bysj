@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   ArrowRight,
@@ -238,6 +238,13 @@ const handleLogout = () => {
   ElMessage.success('管理员已退出登录');
   router.push('/');
 };
+onMounted(() => {
+  document.body.classList.add('admin-body');
+});
+
+onUnmounted(() => {
+  document.body.classList.remove('admin-body');
+});
 </script>
 
 <style scoped lang="scss">
@@ -253,20 +260,23 @@ const handleLogout = () => {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding-bottom: 12px;
+  gap: 20px;
+  padding-bottom: 18px;
 }
 
 .admin-topbar {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 18px;
   align-items: center;
-  padding: 16px 18px;
-  border-radius: 34px;
-  background: linear-gradient(135deg, rgba(255, 216, 76, 0.98) 0%, rgba(255, 228, 126, 0.98) 100%);
-  box-shadow: 0 18px 38px rgba(176, 133, 16, 0.14);
-  border: 1px solid rgba(161, 119, 8, 0.14);
+  padding: 18px 20px;
+  border-radius: 32px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 246, 210, 0.42), transparent 22%),
+    linear-gradient(135deg, rgba(255, 216, 76, 0.98) 0%, rgba(255, 228, 126, 0.98) 100%);
+  box-shadow: 0 22px 42px rgba(176, 133, 16, 0.16);
+  border: 1px solid rgba(161, 119, 8, 0.16);
 }
 
 .admin-brand {
@@ -274,14 +284,15 @@ const handleLogout = () => {
 }
 
 .admin-command {
-  min-height: 74px;
+  min-height: 78px;
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 0 24px;
-  border-radius: 24px;
-  background: rgba(255, 251, 237, 0.92);
-  border: 1px solid rgba(32, 39, 51, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 251, 237, 0.9);
+  border: 1px solid rgba(32, 39, 51, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
   color: rgba(64, 57, 33, 0.72);
 }
 
@@ -326,7 +337,8 @@ const handleLogout = () => {
   text-decoration: none;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: inset 0 0 0 1px rgba(146, 109, 11, 0.08);
 }
 
 .admin-shortcut:hover {
@@ -340,13 +352,15 @@ const handleLogout = () => {
 }
 
 .admin-statusbar {
-  padding: 14px 18px;
+  padding: 16px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   border-radius: 28px;
-  background: rgba(255, 252, 240, 0.8);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 240, 0.86) 0%, rgba(255, 247, 220, 0.82) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 
 .admin-statusbar__chips {
@@ -362,6 +376,7 @@ const handleLogout = () => {
   padding: 10px 14px;
   border-radius: 18px;
   background: rgba(255, 245, 212, 0.88);
+  border: 1px solid rgba(180, 140, 29, 0.08);
 }
 
 .status-chip small {
@@ -386,7 +401,7 @@ const handleLogout = () => {
   overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) 420px;
-  gap: 28px;
+  gap: 24px;
   padding: 36px;
   background: linear-gradient(180deg, rgba(255, 248, 219, 0.98) 0%, rgba(255, 239, 175, 0.96) 100%);
 }
@@ -411,7 +426,7 @@ const handleLogout = () => {
 .admin-hero__main {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 24px;
 }
 
 .hero-heading {
@@ -427,6 +442,7 @@ const handleLogout = () => {
   color: #ffe27a;
   font-size: 14px;
   font-weight: 700;
+  box-shadow: 0 12px 24px rgba(32, 39, 51, 0.14);
 }
 
 .admin-hero__main h1 {
@@ -440,7 +456,7 @@ const handleLogout = () => {
   max-width: 880px;
   margin: 0;
   font-size: 18px;
-  line-height: 1.9;
+  line-height: 1.85;
   color: var(--qh-text-secondary);
 }
 
@@ -459,7 +475,8 @@ const handleLogout = () => {
   border-radius: 999px;
   text-decoration: none;
   font-weight: 800;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid transparent;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .hero-action:hover {
@@ -486,7 +503,7 @@ const handleLogout = () => {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  max-width: 820px;
+  max-width: 860px;
 }
 
 .metric-card {
@@ -495,6 +512,7 @@ const handleLogout = () => {
   background: rgba(255, 252, 240, 0.92);
   border: 1px solid rgba(182, 142, 32, 0.08);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
+  min-height: 136px;
 }
 
 .metric-card small {
@@ -520,9 +538,10 @@ const handleLogout = () => {
 .admin-hero__aside {
   padding: 18px;
   border-radius: 32px;
-  background: rgba(231, 238, 232, 0.9);
+  background: linear-gradient(180deg, rgba(231, 238, 232, 0.9) 0%, rgba(243, 246, 237, 0.96) 100%);
   display: grid;
   gap: 18px;
+  border: 1px solid rgba(134, 167, 136, 0.14);
 }
 
 .aside-card {
@@ -559,6 +578,7 @@ const handleLogout = () => {
   padding: 20px 22px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(123, 142, 112, 0.08);
 }
 
 .mini-stat span {
@@ -592,8 +612,8 @@ const handleLogout = () => {
 .content-panel :deep(.section-card) {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(179, 138, 22, 0.08);
-  box-shadow: 0 20px 36px rgba(138, 109, 22, 0.08);
+  border: 1px solid rgba(179, 138, 22, 0.1);
+  box-shadow: 0 24px 42px rgba(138, 109, 22, 0.1);
 }
 
 .content-panel :deep(.section-card::before) {
@@ -602,6 +622,10 @@ const handleLogout = () => {
   inset: 0 0 auto 0;
   height: 5px;
   background: linear-gradient(90deg, #202733 0%, #ffd85b 40%, rgba(255, 216, 91, 0.08) 100%);
+}
+
+.content-panel :deep(.section-card__body) {
+  gap: 18px;
 }
 
 .content-panel :deep(.stat-card) {
@@ -681,6 +705,10 @@ const handleLogout = () => {
   border: 1px solid rgba(181, 139, 23, 0.06);
 }
 
+.content-panel :deep(.pagination-bar) {
+  margin-top: 22px;
+}
+
 .content-panel :deep(.el-table th.el-table__cell) {
   background: rgba(255, 245, 214, 0.86);
   color: var(--qh-text-primary);
@@ -711,6 +739,10 @@ const handleLogout = () => {
   .admin-statusbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .admin-hero {
+    padding: 28px;
   }
 }
 

@@ -14,6 +14,7 @@ export interface CategoryItem {
 
 export interface GoodsItem {
   id: number;
+  sellerId: number;
   title: string;
   price: number;
   originalPrice: number;
@@ -171,6 +172,7 @@ const normalizeGoodsItem = (value: unknown): GoodsItem => {
   const item = toRecord(value);
   return {
     id: toNumber(item.id),
+    sellerId: toNumber(item.sellerId),
     title: toString(item.title, '未命名商品'),
     price: toNumber(item.price),
     originalPrice: toNumber(item.originalPrice),
@@ -288,6 +290,7 @@ const normalizeBannerList = (value: unknown): BannerItem[] => Array.isArray(valu
 const normalizeCommentList = (value: unknown): CommentItem[] => Array.isArray(value) ? value.map(normalizeCommentItem) : [];
 const normalizeAppointmentList = (value: unknown): AppointmentItem[] => Array.isArray(value) ? value.map(normalizeAppointmentItem) : [];
 const normalizeNotificationList = (value: unknown): NotificationItem[] => Array.isArray(value) ? value.map(normalizeNotificationItem) : [];
+const normalizeLocalDateTime = (value: string): string => value.trim().replace(' ', 'T');
 
 const normalizeHomeData = (value: unknown): HomeData => {
   const item = toRecord(value);
@@ -414,7 +417,10 @@ export const createAppointment = async (payload: {
   intendedLocation: string;
   remark: string;
 }): Promise<AppointmentItem> => {
-  const response = await http.post('/appointments', payload) as ApiResponse<unknown>;
+  const response = await http.post('/appointments', {
+    ...payload,
+    intendedTime: normalizeLocalDateTime(payload.intendedTime),
+  }) as ApiResponse<unknown>;
   return normalizeAppointmentItem(response.data);
 };
 

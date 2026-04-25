@@ -387,23 +387,30 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 .stat-card {
-  padding: 22px;
+  padding: 24px;
+  display: grid;
+  align-content: end;
+  gap: 8px;
 }
 
 .stat-card span {
+  font-size: 13px;
+  letter-spacing: 0.04em;
   color: var(--qh-text-secondary);
 }
 
 .stat-card strong {
   display: block;
-  margin: 14px 0 10px;
-  font-size: 30px;
+  margin: 6px 0 2px;
+  font-size: 34px;
+  line-height: 1;
   color: var(--qh-primary-deep);
 }
 
 .stat-card p {
   margin: 0;
   color: var(--qh-text-secondary);
+  line-height: 1.75;
 }
 
 .operations-grid {
@@ -414,14 +421,16 @@ onBeforeUnmount(() => {
 
 .operation-card {
   display: grid;
-  gap: 12px;
-  padding: 24px;
+  gap: 14px;
+  padding: 26px;
   text-decoration: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  border: 1px solid rgba(180, 141, 30, 0.1);
 }
 
 .operation-card:hover {
   transform: translateY(-2px);
+  box-shadow: 0 22px 40px rgba(128, 94, 15, 0.12);
 }
 
 .operation-card__badge {
@@ -436,6 +445,7 @@ onBeforeUnmount(() => {
 .operation-card strong {
   font-size: 22px;
   color: var(--qh-text-primary);
+  line-height: 1.35;
 }
 
 .operation-card p {
@@ -468,8 +478,10 @@ onBeforeUnmount(() => {
 
 .chart-card,
 .single-chart-card {
-  padding: 18px;
+  padding: 20px;
   border-radius: 24px;
+  border: 1px solid rgba(168, 137, 34, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
 }
 
 .chart-card__header {
@@ -488,6 +500,7 @@ onBeforeUnmount(() => {
   margin: 8px 0 0;
   color: var(--qh-text-secondary);
   line-height: 1.7;
+  max-width: 28rem;
 }
 
 .chart-card__badge,
@@ -527,9 +540,9 @@ onBeforeUnmount(() => {
 
 .session-banner {
   margin-bottom: 18px;
-  padding: 18px 20px;
+  padding: 20px 22px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .session-banner__label {
@@ -555,7 +568,8 @@ onBeforeUnmount(() => {
 }
 
 .todo-item {
-  padding: 18px;
+  padding: 20px;
+  border-radius: 20px;
 }
 
 .todo-item strong {
@@ -579,15 +593,16 @@ onBeforeUnmount(() => {
 
 .announcement-summary {
   margin-bottom: 18px;
-  padding: 16px;
+  padding: 18px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
 .announcement-summary article {
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 16px 18px;
+  min-height: 106px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.72);
 }
 
@@ -606,6 +621,7 @@ onBeforeUnmount(() => {
 
 .state-panel {
   padding: 12px;
+  border-radius: 24px;
 }
 
 @media (max-width: 1280px) {

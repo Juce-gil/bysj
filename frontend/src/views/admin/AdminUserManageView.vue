@@ -340,36 +340,44 @@ onMounted(loadUsers);
 
 <style scoped lang="scss">
 .stat-card {
-  padding: 22px;
+  padding: 24px;
+  display: grid;
+  align-content: end;
+  gap: 8px;
 }
 
 .stat-card span {
   color: var(--qh-text-secondary);
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
 
 .stat-card strong {
   display: block;
-  margin: 14px 0 10px;
-  font-size: 30px;
+  margin: 6px 0 2px;
+  font-size: 34px;
+  line-height: 1;
   color: var(--qh-primary-deep);
 }
 
 .stat-card p {
   margin: 0;
   color: var(--qh-text-secondary);
+  line-height: 1.75;
 }
 
 .filter-overview {
-  margin-bottom: 18px;
-  padding: 16px;
+  margin-bottom: 20px;
+  padding: 18px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
 .filter-overview article {
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 16px 18px;
+  min-height: 108px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -381,7 +389,7 @@ onMounted(loadUsers);
 .filter-overview strong {
   display: block;
   margin-top: 10px;
-  font-size: 20px;
+  font-size: 21px;
   color: var(--qh-text-primary);
   line-height: 1.5;
 }
@@ -420,11 +428,12 @@ onMounted(loadUsers);
 
 .filter-actions {
   justify-content: flex-end;
+  align-self: stretch;
 }
 
 .table-headline {
   margin-bottom: 18px;
-  padding: 18px 20px;
+  padding: 20px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -444,7 +453,7 @@ onMounted(loadUsers);
 .info-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 14px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.84);
@@ -468,23 +477,25 @@ onMounted(loadUsers);
 
 .table-wrapper {
   margin-top: 18px;
+  overflow: hidden;
 }
 
 .user-cell {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .user-avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
+  width: 50px;
+  height: 50px;
+  border-radius: 18px;
   display: grid;
   place-items: center;
   background: linear-gradient(135deg, rgba(255, 221, 119, 0.95), rgba(255, 248, 209, 0.95));
   color: var(--qh-text-primary);
   font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .user-cell__content {
@@ -495,6 +506,7 @@ onMounted(loadUsers);
 .user-cell strong {
   color: var(--qh-text-primary);
   line-height: 1.5;
+  font-size: 15px;
 }
 
 .user-cell span {

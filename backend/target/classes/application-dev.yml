@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/kecheng_campus_market?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    username: ${DB_USERNAME:market_user}
+    password: ${DB_PASSWORD:market_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 market:

@@ -678,28 +678,35 @@ onMounted(loadAnnouncements);
 
 <style scoped lang="scss">
 .stat-card {
-  padding: 22px;
+  padding: 24px;
+  display: grid;
+  align-content: end;
+  gap: 8px;
 }
 
 .stat-card span {
   color: var(--qh-text-secondary);
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
 
 .stat-card strong {
   display: block;
-  margin: 14px 0 10px;
-  font-size: 30px;
+  margin: 6px 0 2px;
+  font-size: 34px;
+  line-height: 1;
   color: var(--qh-primary-deep);
 }
 
 .stat-card p {
   margin: 0;
   color: var(--qh-text-secondary);
+  line-height: 1.75;
 }
 
 .filter-overview {
-  margin-bottom: 18px;
-  padding: 16px;
+  margin-bottom: 20px;
+  padding: 18px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
@@ -707,8 +714,9 @@ onMounted(loadAnnouncements);
 
 .filter-overview article,
 .detail-summary article {
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 16px 18px;
+  min-height: 108px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -722,7 +730,7 @@ onMounted(loadAnnouncements);
 .detail-summary strong {
   display: block;
   margin-top: 10px;
-  font-size: 20px;
+  font-size: 21px;
   color: var(--qh-text-primary);
   line-height: 1.5;
 }
@@ -766,6 +774,7 @@ onMounted(loadAnnouncements);
 
 .filter-actions {
   justify-content: flex-end;
+  align-self: stretch;
 }
 
 .card-actions {
@@ -774,7 +783,7 @@ onMounted(loadAnnouncements);
 
 .table-headline {
   margin-bottom: 18px;
-  padding: 18px 20px;
+  padding: 20px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -794,7 +803,7 @@ onMounted(loadAnnouncements);
 .info-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 14px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.84);
@@ -818,22 +827,24 @@ onMounted(loadAnnouncements);
 
 .table-wrapper {
   margin-top: 18px;
+  overflow: hidden;
 }
 
 .announcement-cell {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .announcement-cell__header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .announcement-cell strong {
   color: var(--qh-text-primary);
   line-height: 1.5;
+  font-size: 15px;
 }
 
 .announcement-cell p {
@@ -863,17 +874,20 @@ onMounted(loadAnnouncements);
 
 .detail-panel {
   min-height: 240px;
+  display: grid;
+  gap: 24px;
 }
 
 .detail-head {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .detail-head h2 {
   margin: 0;
   color: var(--qh-text-primary);
   line-height: 1.5;
+  font-size: 28px;
 }
 
 .detail-tags {
@@ -889,9 +903,8 @@ onMounted(loadAnnouncements);
 }
 
 .detail-section {
-  margin-top: 24px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .detail-section__label {
@@ -906,11 +919,11 @@ onMounted(loadAnnouncements);
 }
 
 .detail-content {
-  padding: 16px;
+  padding: 18px;
   line-height: 1.9;
   color: var(--qh-text-regular);
   white-space: pre-wrap;
-  border-radius: 16px;
+  border-radius: 20px;
 }
 
 .form-panel {
@@ -919,7 +932,8 @@ onMounted(loadAnnouncements);
 
 .form-tips {
   margin-bottom: 18px;
-  padding: 16px 18px;
+  padding: 18px 20px;
+  border-radius: 20px;
 }
 
 .form-tips strong {
@@ -944,8 +958,8 @@ onMounted(loadAnnouncements);
 
 .switch-group {
   height: 100%;
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
   display: grid;
   gap: 14px;
 }

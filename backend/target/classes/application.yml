@@ -2,7 +2,7 @@ spring:
   application:
     name: kecheng-market-backend
   profiles:
-    active: memory
+    active: dev
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
@@ -39,8 +39,8 @@ mybatis-plus:
       logic-delete-value: 1
 
 market:
-  school-name: 科成校园
-  storage-mode: memory
+  school-name: Kecheng Campus
+  storage-mode: mysql
   cors:
     allowed-origin-patterns: "*"
   jwt:

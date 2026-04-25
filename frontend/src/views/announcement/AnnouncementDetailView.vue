@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import EmptyHint from '@/components/EmptyHint.vue';
 import { getAnnouncementDetail, type AnnouncementItem } from '@/api/marketplace';
@@ -89,7 +89,9 @@ const loadDetail = async () => {
   }
 };
 
-onMounted(loadDetail);
+watch(() => route.params.id, () => {
+  loadDetail();
+}, { immediate: true });
 </script>
 
 <style scoped lang="scss">

@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Wanted")
 @RestController
 @RequestMapping("/api/wanted")
-@AnonymousAccess
 public class WantedController {
 
     private final WantedService wantedService;
@@ -34,12 +33,14 @@ public class WantedController {
 
     @Operation(summary = "Wanted list")
     @GetMapping
+    @AnonymousAccess
     public ApiResponse<List<WantedVo>> list() {
         return ApiResponse.success(wantedService.list(UserContext.getUserId()));
     }
 
     @Operation(summary = "Wanted detail")
     @GetMapping("/{id}")
+    @AnonymousAccess
     public ApiResponse<WantedVo> detail(@PathVariable Long id) {
         return ApiResponse.success(wantedService.detail(id, UserContext.getUserId() != null));
     }

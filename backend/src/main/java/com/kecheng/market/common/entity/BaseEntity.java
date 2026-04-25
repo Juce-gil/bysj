@@ -6,20 +6,17 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
-/**
- * MyBatis-Plus 实体基类占位，当前内存版接口不会直接使用。
- */
 public class BaseEntity {
 
-    @Schema(description = "创建时间")
+    @Schema(description = "Create time")
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
-    @Schema(description = "更新时间")
+    @Schema(description = "Update time")
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
-    @Schema(description = "逻辑删除标记：0 未删除，1 已删除")
+    @Schema(description = "Logical delete flag")
     @TableLogic
     private Integer deleted;
 

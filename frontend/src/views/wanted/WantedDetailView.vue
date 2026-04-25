@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import EmptyHint from '@/components/EmptyHint.vue';
 import SectionCard from '@/components/SectionCard.vue';
@@ -141,7 +141,9 @@ const loadDetail = async () => {
   }
 };
 
-onMounted(loadDetail);
+watch(() => route.params.id, () => {
+  loadDetail();
+}, { immediate: true });
 </script>
 
 <style scoped lang="scss">

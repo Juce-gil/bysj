@@ -7,3 +7,5 @@ spring:
 
 market:
   storage-mode: memory
+  memory:
+    snapshot-path: data/market-store-memory.ser

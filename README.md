@@ -22,7 +22,7 @@
 - Maven 3.9.x
 - MyBatis-Plus（项目内已集成）
 - Knife4j / OpenAPI
-- 当前默认运行模式：`memory`
+- 当前默认运行模式：`mysql`（动态数据默认持久化）
 
 ### 前端
 - Vue 3
@@ -92,7 +92,14 @@ E:\毕设
 cd E:\毕设\backend
 ```
 
-运行：
+先启动本地 MySQL（推荐直接使用项目自带 Docker Compose）：
+
+```powershell
+cd E:\毕设
+docker compose up -d mysql
+```
+
+再启动后端：
 
 ```powershell
 mvn spring-boot:run
@@ -102,7 +109,13 @@ mvn spring-boot:run
 - 后端：`http://127.0.0.1:8080`
 - Swagger：`http://127.0.0.1:8080/swagger-ui.html`
 
-> 当前 `application.yml` 默认启用 `memory` 模式，适合毕业设计演示。
+> 当前 `application.yml` 默认启用 `mysql` 模式，动态数据会落到 MySQL 中，重启后仍会保留。
+> `application-dev.yml` 的默认账号已与 `docker-compose.yml` 对齐，直接起 `mysql` 服务后即可本地联调。
+> 如果只想临时回到内存模式，可显式使用 `memory` profile。
+
+```powershell
+mvn spring-boot:run "-Dspring-boot.run.profiles=memory"
+```
 
 ### 5.2 启动前端
 
@@ -156,8 +169,8 @@ npm run dev
 
 ## 8. 当前已知限制
 
-1. 后端主线当前默认使用 `memory` 存储模式，重启后动态数据不会长期保留。
-2. 自动化测试尚未完善。
+1. 本地开发和部署前需要先准备可用的 MySQL 实例，否则后端无法以默认持久化模式启动。
+2. MySQL/Testcontainers 集成测试在没有 Docker 运行环境的机器上会自动跳过。
 3. 后台管理模块以演示可用为主，细节体验仍可继续优化。
 4. 安全性为毕业设计级别，尚未做商用级强化。
 
@@ -165,9 +178,8 @@ npm run dev
 
 ## 9. 后续优化方向
 
-- 将主业务完整迁移到 MySQL 持久化
+- 扩展 MySQL/Testcontainers 集成测试覆盖面
 - 完善接口测试 / 单元测试
 - 补充操作日志、异常追踪、权限边界
 - 继续统一后台视觉风格
 - 增强答辩演示数据与演示脚本
-

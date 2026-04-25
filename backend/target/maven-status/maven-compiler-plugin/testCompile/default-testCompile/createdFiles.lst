@@ -1,0 +1,11 @@
+com\kecheng\market\GoodsApiIntegrationTest.class
+com\kecheng\market\MysqlPersistenceIntegrationTest.class
+com\kecheng\market\auth\service\impl\AuthServiceImplTest.class
+com\kecheng\market\support\AbstractApiIntegrationTest.class
+com\kecheng\market\support\ApiIntegrationTestSupport.class
+com\kecheng\market\security\util\JwtUtilTest.class
+com\kecheng\market\WantedApiIntegrationTest.class
+com\kecheng\market\AdminApiIntegrationTest.class
+com\kecheng\market\AppointmentAndNotificationApiIntegrationTest.class
+com\kecheng\market\AuthAndUserApiIntegrationTest.class
+com\kecheng\market\support\AbstractMysqlApiIntegrationTest.class

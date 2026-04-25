@@ -30,7 +30,17 @@ import com.kecheng.market.notification.vo.NotificationVo;
 import com.kecheng.market.user.vo.UserProfileVo;
 import com.kecheng.market.wanted.vo.WantedVo;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -46,14 +56,22 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Component
+@ConditionalOnProperty(name = "market.storage-mode", havingValue = "memory")
 public class MarketStore {
-    @Value(value="${market.school-name:\u79d1\u6210}")
+    private static final Logger log = LoggerFactory.getLogger(MarketStore.class);
+
+    @Value(value="${market.school-name:\u79d1\u6210\u6821\u56ed}")
     private String schoolName;
+    @Value(value="${market.memory.snapshot-path:data/market-store-memory.ser}")
+    private String snapshotPath;
     private final Map<Long, UserData> users = new ConcurrentHashMap<Long, UserData>();
     private final Map<Long, CategoryData> categories = new LinkedHashMap<Long, CategoryData>();
     private final Map<Long, GoodsData> goods = new LinkedHashMap<Long, GoodsData>();
@@ -73,7 +91,21 @@ public class MarketStore {
     private final AtomicLong notificationIdGenerator = new AtomicLong(20L);
 
     @PostConstruct
-    public void init() {
+    public synchronized void init() {
+        if (this.restoreSnapshotQuietly()) {
+            return;
+        }
+        this.initializeDefaults();
+        this.persistSnapshotQuietly();
+    }
+
+    @PreDestroy
+    public void destroy() {
+        this.persistSnapshotQuietly();
+    }
+
+    private void initializeDefaults() {
+        this.clearState();
         this.initUsers();
         this.initCategories();
         this.initGoods();
@@ -84,6 +116,132 @@ public class MarketStore {
         this.initFavorites();
         this.initAppointments();
         this.initNotifications();
+    }
+
+    private void clearState() {
+        this.users.clear();
+        this.categories.clear();
+        this.goods.clear();
+        this.wantedMap.clear();
+        this.announcements.clear();
+        this.banners.clear();
+        this.commentsByGoods.clear();
+        this.favoritesByUser.clear();
+        this.appointments.clear();
+        this.notificationsByUser.clear();
+        this.userIdGenerator.set(10L);
+        this.goodsIdGenerator.set(0L);
+        this.wantedIdGenerator.set(0L);
+        this.announcementIdGenerator.set(0L);
+        this.commentIdGenerator.set(10L);
+        this.appointmentIdGenerator.set(10L);
+        this.notificationIdGenerator.set(20L);
+    }
+
+    private boolean restoreSnapshotQuietly() {
+        Path path = this.resolveSnapshotPath();
+        if (!Files.exists(path)) {
+            return false;
+        }
+        try (ObjectInputStream inputStream = new ObjectInputStream(new BufferedInputStream(Files.newInputStream(path)))) {
+            Object snapshot = inputStream.readObject();
+            if (!(snapshot instanceof MarketStoreSnapshot marketStoreSnapshot)) {
+                log.warn("Unsupported market store snapshot format: {}", path);
+                return false;
+            }
+            this.applySnapshot(marketStoreSnapshot);
+            log.info("Loaded market store snapshot from {}", path);
+            return true;
+        } catch (Exception exception) {
+            log.warn("Failed to restore market store snapshot from {}, falling back to defaults", path, exception);
+            return false;
+        }
+    }
+
+    private synchronized void persistSnapshotQuietly() {
+        Path path = this.resolveSnapshotPath();
+        try {
+            Path parent = path.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            try (ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(Files.newOutputStream(path)))) {
+                outputStream.writeObject(this.buildSnapshot());
+                outputStream.flush();
+            }
+        } catch (IOException exception) {
+            log.warn("Failed to persist market store snapshot to {}", path, exception);
+        }
+    }
+
+    private Path resolveSnapshotPath() {
+        return Paths.get(this.snapshotPath).toAbsolutePath().normalize();
+    }
+
+    private MarketStoreSnapshot buildSnapshot() {
+        MarketStoreSnapshot snapshot = new MarketStoreSnapshot();
+        snapshot.users = new ConcurrentHashMap<Long, UserData>(this.users);
+        snapshot.categories = new LinkedHashMap<Long, CategoryData>(this.categories);
+        snapshot.goods = new LinkedHashMap<Long, GoodsData>(this.goods);
+        snapshot.wantedMap = new LinkedHashMap<Long, WantedData>(this.wantedMap);
+        snapshot.announcements = new LinkedHashMap<Long, AnnouncementData>(this.announcements);
+        snapshot.banners = new LinkedHashMap<Long, BannerData>(this.banners);
+        snapshot.commentsByGoods = new HashMap<Long, List<CommentData>>();
+        this.commentsByGoods.forEach((goodsId, items) -> snapshot.commentsByGoods.put(goodsId, new ArrayList<CommentData>(items)));
+        snapshot.favoritesByUser = new HashMap<Long, LinkedHashSet<Long>>();
+        this.favoritesByUser.forEach((userId, itemIds) -> snapshot.favoritesByUser.put(userId, new LinkedHashSet<Long>(itemIds)));
+        snapshot.appointments = new LinkedHashMap<Long, AppointmentData>(this.appointments);
+        snapshot.notificationsByUser = new HashMap<Long, List<NotificationData>>();
+        this.notificationsByUser.forEach((userId, items) -> snapshot.notificationsByUser.put(userId, new ArrayList<NotificationData>(items)));
+        snapshot.userIdGenerator = this.userIdGenerator.get();
+        snapshot.goodsIdGenerator = this.goodsIdGenerator.get();
+        snapshot.wantedIdGenerator = this.wantedIdGenerator.get();
+        snapshot.announcementIdGenerator = this.announcementIdGenerator.get();
+        snapshot.commentIdGenerator = this.commentIdGenerator.get();
+        snapshot.appointmentIdGenerator = this.appointmentIdGenerator.get();
+        snapshot.notificationIdGenerator = this.notificationIdGenerator.get();
+        return snapshot;
+    }
+
+    private void applySnapshot(MarketStoreSnapshot snapshot) {
+        this.clearState();
+        if (snapshot.users != null) {
+            this.users.putAll(snapshot.users);
+        }
+        if (snapshot.categories != null) {
+            this.categories.putAll(snapshot.categories);
+        }
+        if (snapshot.goods != null) {
+            this.goods.putAll(snapshot.goods);
+        }
+        if (snapshot.wantedMap != null) {
+            this.wantedMap.putAll(snapshot.wantedMap);
+        }
+        if (snapshot.announcements != null) {
+            this.announcements.putAll(snapshot.announcements);
+        }
+        if (snapshot.banners != null) {
+            this.banners.putAll(snapshot.banners);
+        }
+        if (snapshot.commentsByGoods != null) {
+            snapshot.commentsByGoods.forEach((goodsId, items) -> this.commentsByGoods.put(goodsId, items == null ? new ArrayList<CommentData>() : new ArrayList<CommentData>(items)));
+        }
+        if (snapshot.favoritesByUser != null) {
+            snapshot.favoritesByUser.forEach((userId, itemIds) -> this.favoritesByUser.put(userId, itemIds == null ? new LinkedHashSet<Long>() : new LinkedHashSet<Long>(itemIds)));
+        }
+        if (snapshot.appointments != null) {
+            this.appointments.putAll(snapshot.appointments);
+        }
+        if (snapshot.notificationsByUser != null) {
+            snapshot.notificationsByUser.forEach((userId, items) -> this.notificationsByUser.put(userId, items == null ? new ArrayList<NotificationData>() : new ArrayList<NotificationData>(items)));
+        }
+        this.userIdGenerator.set(Math.max(snapshot.userIdGenerator, this.users.keySet().stream().mapToLong(Long::longValue).max().orElse(10L)));
+        this.goodsIdGenerator.set(Math.max(snapshot.goodsIdGenerator, this.goods.keySet().stream().mapToLong(Long::longValue).max().orElse(0L)));
+        this.wantedIdGenerator.set(Math.max(snapshot.wantedIdGenerator, this.wantedMap.keySet().stream().mapToLong(Long::longValue).max().orElse(0L)));
+        this.announcementIdGenerator.set(Math.max(snapshot.announcementIdGenerator, this.announcements.keySet().stream().mapToLong(Long::longValue).max().orElse(0L)));
+        this.commentIdGenerator.set(Math.max(snapshot.commentIdGenerator, this.commentsByGoods.values().stream().flatMap(List::stream).mapToLong(item -> item.id).max().orElse(10L)));
+        this.appointmentIdGenerator.set(Math.max(snapshot.appointmentIdGenerator, this.appointments.keySet().stream().mapToLong(Long::longValue).max().orElse(10L)));
+        this.notificationIdGenerator.set(Math.max(snapshot.notificationIdGenerator, this.notificationsByUser.values().stream().flatMap(List::stream).mapToLong(item -> item.id).max().orElse(20L)));
     }
 
     public UserData findUserByUsernameOrStudentNo(String account) {
@@ -108,6 +266,7 @@ public class MarketStore {
         UserData updatedUser = new UserData(currentUser.id, currentUser.username, currentUser.password, normalizedName, currentUser.role, currentUser.school, normalizedSlogan, currentUser.studentNo, normalizedPhone, normalizedQq, currentUser.disabled, currentUser.deleted, currentUser.createTime);
         this.users.put(userId, updatedUser);
         this.syncUserRelatedData(updatedUser);
+        this.persistSnapshotQuietly();
         return this.getUserProfile(userId);
     }
 
@@ -119,6 +278,7 @@ public class MarketStore {
         long id = this.userIdGenerator.incrementAndGet();
         String nickname = displayName == null || displayName.isBlank() ? username : displayName;
         this.users.put(id, new UserData(id, username, password, nickname, "user", this.schoolName, "Hope every idle item finds a new owner.", studentNo, phone, "", false, false, LocalDateTime.now()));
+        this.persistSnapshotQuietly();
         return this.getUserProfile(id);
     }
 
@@ -168,6 +328,7 @@ public class MarketStore {
             nowFavorited = true;
             this.addNotification(goodsData.sellerId, "\u5546\u54c1\u88ab\u6536\u85cf", "\u4f60\u7684\u5546\u54c1\u300a" + goodsData.title + "\u300b\u6536\u5230\u65b0\u7684\u6536\u85cf\u3002", "favorite", goodsData.id);
         }
+        this.persistSnapshotQuietly();
         return nowFavorited;
     }
 
@@ -191,6 +352,7 @@ public class MarketStore {
         CommentData commentData = new CommentData(this.commentIdGenerator.incrementAndGet(), goodsId, userId, userData.name, content, LocalDateTime.now());
         this.commentsByGoods.computeIfAbsent(goodsId, key -> new ArrayList()).add(commentData);
         this.addNotification(goodsData.sellerId, "\u5546\u54c1\u6536\u5230\u65b0\u8bc4\u8bba", userData.name + " \u8bc4\u8bba\u4e86\u4f60\u7684\u5546\u54c1\u300a" + goodsData.title + "\u300b\u3002", "comment", goodsId);
+        this.persistSnapshotQuietly();
         return new CommentVo(commentData.id, commentData.goodsId, commentData.userId, commentData.userName, commentData.content, DateTimeUtil.formatDateTime(commentData.createTime));
     }
 
@@ -249,6 +411,7 @@ public class MarketStore {
         );
         this.goods.put(goodsId, goodsData);
         this.addNotification(userId, "Goods published", "Your goods [" + goodsData.title + "] is now visible in the marketplace.", "goods_publish", goodsId);
+        this.persistSnapshotQuietly();
         return this.toGoodsVo(goodsData, userId);
     }
 
@@ -279,6 +442,7 @@ public class MarketStore {
         );
         this.wantedMap.put(wantedId, wantedData);
         this.addNotification(userId, "Wanted published", "Your wanted post has been published successfully.", "wanted_publish", wantedId);
+        this.persistSnapshotQuietly();
         return this.toWantedVo(wantedData, true);
     }
 
@@ -313,6 +477,7 @@ public class MarketStore {
         );
         this.goods.put(goodsId, updated);
         this.addNotification(userId, "Goods updated", "Your goods information has been updated.", "goods_update", goodsId);
+        this.persistSnapshotQuietly();
         return this.toGoodsVo(updated, userId);
     }
 
@@ -327,6 +492,7 @@ public class MarketStore {
         GoodsData updated = this.copyGoodsWithStatus(current, "off_shelf", false);
         this.goods.put(goodsId, updated);
         this.addNotification(userId, "Goods off shelf", "Your goods has been taken off shelf.", "goods_off_shelf", goodsId);
+        this.persistSnapshotQuietly();
         return this.toGoodsVo(updated, userId);
     }
 
@@ -341,6 +507,7 @@ public class MarketStore {
         GoodsData updated = this.copyGoodsWithStatus(current, "on_sale", false);
         this.goods.put(goodsId, updated);
         this.addNotification(userId, "Goods relisted", "Your goods has been relisted.", "goods_relist", goodsId);
+        this.persistSnapshotQuietly();
         return this.toGoodsVo(updated, userId);
     }
 
@@ -353,6 +520,7 @@ public class MarketStore {
         this.goods.put(goodsId, deleted);
         this.favoritesByUser.values().forEach(item -> item.remove(goodsId));
         this.addNotification(userId, "Goods deleted", "Your goods has been removed from the marketplace.", "goods_delete", goodsId);
+        this.persistSnapshotQuietly();
     }
 
     public WantedVo updateWanted(Long userId, Long wantedId, String title, String budget, String category, String campus, String deadline,
@@ -385,6 +553,7 @@ public class MarketStore {
         );
         this.wantedMap.put(wantedId, updated);
         this.addNotification(userId, "Wanted updated", "Your wanted post has been updated.", "wanted_update", wantedId);
+        this.persistSnapshotQuietly();
         return this.toWantedVo(updated, true);
     }
 
@@ -399,6 +568,7 @@ public class MarketStore {
         WantedData updated = this.copyWantedWithStatus(current, "closed", false);
         this.wantedMap.put(wantedId, updated);
         this.addNotification(userId, "Wanted closed", "Your wanted post has been closed.", "wanted_close", wantedId);
+        this.persistSnapshotQuietly();
         return this.toWantedVo(updated, true);
     }
 
@@ -413,6 +583,7 @@ public class MarketStore {
         WantedData updated = this.copyWantedWithStatus(current, "buying", false);
         this.wantedMap.put(wantedId, updated);
         this.addNotification(userId, "Wanted reopened", "Your wanted post has been reopened.", "wanted_reopen", wantedId);
+        this.persistSnapshotQuietly();
         return this.toWantedVo(updated, true);
     }
 
@@ -421,6 +592,7 @@ public class MarketStore {
         WantedData deleted = this.copyWantedWithStatus(current, current.status, true);
         this.wantedMap.put(wantedId, deleted);
         this.addNotification(userId, "Wanted deleted", "Your wanted post has been removed.", "wanted_delete", wantedId);
+        this.persistSnapshotQuietly();
     }
 
     public List<AnnouncementVo> listAnnouncements() {
@@ -464,6 +636,7 @@ public class MarketStore {
         goodsData.status = "reserved";
         this.addNotification(seller.id, "\u65b0\u7684\u9884\u7ea6\u7533\u8bf7", buyer.name + " \u9884\u7ea6\u4e86\u4f60\u7684\u5546\u54c1\u300a" + goodsData.title + "\u300b\u3002", "appointment_apply", appointmentData.id);
         this.addNotification(buyer.id, "\u9884\u7ea6\u5df2\u63d0\u4ea4", "\u4f60\u5df2\u63d0\u4ea4\u5546\u54c1\u300a" + goodsData.title + "\u300b\u7684\u9884\u7ea6\u7533\u8bf7\uff0c\u8bf7\u7b49\u5f85\u5356\u5bb6\u786e\u8ba4\u3002", "appointment_apply", appointmentData.id);
+        this.persistSnapshotQuietly();
         return this.toAppointmentVo(appointmentData);
     }
 
@@ -486,6 +659,7 @@ public class MarketStore {
         appointmentData.status = "cancelled";
         this.getGoodsData((Long)appointmentData.goodsId).status = "on_sale";
         this.addNotification(appointmentData.sellerId, "\u9884\u7ea6\u5df2\u53d6\u6d88", appointmentData.buyerName + " \u53d6\u6d88\u4e86\u5546\u54c1\u300a" + appointmentData.goodsTitle + "\u300b\u7684\u9884\u7ea6\u3002", "appointment_cancel", appointmentId);
+        this.persistSnapshotQuietly();
         return this.toAppointmentVo(appointmentData);
     }
 
@@ -506,6 +680,7 @@ public class MarketStore {
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException("\u901a\u77e5\u4e0d\u5b58\u5728"));
         notificationData.read = true;
+        this.persistSnapshotQuietly();
     }
 
     public PageResult<AdminUserListItemVo> pageAdminUsers(String keyword, String role, Boolean disabled, Long pageNum, Long pageSize) {
@@ -528,6 +703,7 @@ public class MarketStore {
         UserData userData = this.getUserData(targetUserId);
         UserData updatedUser = new UserData(userData.id, userData.username, userData.password, userData.name, userData.role, userData.school, userData.slogan, userData.studentNo, userData.phone, userData.qq, disabled, userData.deleted, userData.createTime);
         this.users.put(targetUserId, updatedUser);
+        this.persistSnapshotQuietly();
         return this.toAdminUserListItem(updatedUser);
     }
 
@@ -560,6 +736,7 @@ public class MarketStore {
         GoodsData updated = this.copyGoodsWithStatus(current, "off_shelf", false);
         this.goods.put(id, updated);
         this.addNotification(current.sellerId, "Goods off shelf", "Your goods [" + current.title + "] was taken off shelf by the administrator.", "admin_goods_off_shelf", id);
+        this.persistSnapshotQuietly();
         return this.toAdminGoodsDetailVo(updated);
     }
 
@@ -574,6 +751,7 @@ public class MarketStore {
         GoodsData updated = this.copyGoodsWithStatus(current, "on_sale", false);
         this.goods.put(id, updated);
         this.addNotification(current.sellerId, "Goods relisted", "Your goods [" + current.title + "] has been relisted by the administrator.", "admin_goods_relist", id);
+        this.persistSnapshotQuietly();
         return this.toAdminGoodsDetailVo(updated);
     }
 
@@ -586,6 +764,7 @@ public class MarketStore {
         this.goods.put(id, deleted);
         this.favoritesByUser.values().forEach(item -> item.remove(id));
         this.addNotification(current.sellerId, "Goods deleted", "Your goods [" + current.title + "] was removed by the administrator.", "admin_goods_delete", id);
+        this.persistSnapshotQuietly();
     }
 
     public PageResult<AdminAnnouncementListItemVo> pageAdminAnnouncements(String keyword, Boolean published, Long pageNum, Long pageSize) {
@@ -610,6 +789,7 @@ public class MarketStore {
         Long announcementId = this.announcementIdGenerator.incrementAndGet();
         AnnouncementData announcementData = new AnnouncementData(announcementId, this.requireText(title, "Title cannot be blank"), this.normalizeOptionalText(summary), this.requireText(content, "Content cannot be blank"), Boolean.TRUE.equals(published) ? LocalDateTime.now() : null, this.normalizeAnnouncementLevel(level), Boolean.TRUE.equals(top), Boolean.TRUE.equals(published), false);
         this.announcements.put(announcementId, announcementData);
+        this.persistSnapshotQuietly();
         return this.toAdminAnnouncementDetailVo(announcementData);
     }
 
@@ -624,6 +804,7 @@ public class MarketStore {
         }
         AnnouncementData updated = new AnnouncementData(current.id, this.requireText(title, "Title cannot be blank"), this.normalizeOptionalText(summary), this.requireText(content, "Content cannot be blank"), publishedAt, this.normalizeAnnouncementLevel(level), Boolean.TRUE.equals(top), nextPublished, false);
         this.announcements.put(id, updated);
+        this.persistSnapshotQuietly();
         return this.toAdminAnnouncementDetailVo(updated);
     }
 
@@ -631,6 +812,7 @@ public class MarketStore {
         AnnouncementData current = this.getAdminAnnouncementData(id);
         AnnouncementData updated = new AnnouncementData(current.id, current.title, current.summary, current.content, LocalDateTime.now(), current.level, current.top, true, false);
         this.announcements.put(id, updated);
+        this.persistSnapshotQuietly();
         return this.toAdminAnnouncementDetailVo(updated);
     }
 
@@ -638,12 +820,14 @@ public class MarketStore {
         AnnouncementData current = this.getAdminAnnouncementData(id);
         AnnouncementData updated = new AnnouncementData(current.id, current.title, current.summary, current.content, current.publishedAt, current.level, current.top, false, false);
         this.announcements.put(id, updated);
+        this.persistSnapshotQuietly();
         return this.toAdminAnnouncementDetailVo(updated);
     }
 
     public void deleteAdminAnnouncement(Long id) {
         AnnouncementData current = this.getAdminAnnouncementData(id);
         this.announcements.put(id, new AnnouncementData(current.id, current.title, current.summary, current.content, current.publishedAt, current.level, current.top, current.published, true));
+        this.persistSnapshotQuietly();
     }
 
     private <T> PageResult<T> toPageResult(List<T> allRecords, Long pageNum, Long pageSize) {
@@ -799,7 +983,7 @@ public class MarketStore {
     private GoodsVo toGoodsVo(GoodsData item, Long currentUserId) {
         boolean favorited = currentUserId != null && this.favoritesByUser.getOrDefault(currentUserId, new LinkedHashSet()).contains(item.id);
         String coverImageUrl = item.imageUrls.isEmpty() ? "" : item.imageUrls.get(0);
-        return new GoodsVo(item.id, item.title, item.price, item.originalPrice, item.category, item.campus, item.condition, item.sellerName, DateTimeUtil.formatDateTime(item.publishedAt), item.intro, item.description, item.tags, item.imageUrls, coverImageUrl, item.coverStyle, item.favoriteCount, favorited, item.status);
+        return new GoodsVo(item.id, item.sellerId, item.title, item.price, item.originalPrice, item.category, item.campus, item.condition, item.sellerName, DateTimeUtil.formatDateTime(item.publishedAt), item.intro, item.description, item.tags, item.imageUrls, coverImageUrl, item.coverStyle, item.favoriteCount, favorited, item.status);
     }
 
     private AdminGoodsListItemVo toAdminGoodsListItem(GoodsData item) {
@@ -940,9 +1124,9 @@ public class MarketStore {
     }
 
     private void initBanners() {
-        this.banners.put(1L, new BannerData(1L, "\u6b22\u8fce\u4f7f\u7528\u6821\u56ed\u8df3\u86a4\u5e02\u573a", "/upload/banner/banner1.jpg", "announcement", "1", 1, true, false));
-        this.banners.put(2L, new BannerData(2L, "\u5e73\u53f0\u4f7f\u7528\u8bf4\u660e", "/upload/banner/banner2.jpg", "announcement", "2", 2, true, false));
-        this.banners.put(3L, new BannerData(3L, "\u70ed\u95e8\u5546\u54c1\u63a8\u8350", "/upload/banner/banner3.jpg", "goods", "1", 3, true, false));
+        this.banners.put(1L, new BannerData(1L, "\u6b22\u8fce\u4f7f\u7528\u6821\u56ed\u8df3\u86a4\u5e02\u573a", "/uploads/banner/banner1.jpg", "announcement", "1", 1, true, false));
+        this.banners.put(2L, new BannerData(2L, "\u5e73\u53f0\u4f7f\u7528\u8bf4\u660e", "/uploads/banner/banner2.jpg", "announcement", "2", 2, true, false));
+        this.banners.put(3L, new BannerData(3L, "\u70ed\u95e8\u5546\u54c1\u63a8\u8350", "/uploads/banner/banner3.jpg", "goods", "1", 3, true, false));
     }
 
     private void initComments() {
@@ -967,7 +1151,7 @@ public class MarketStore {
         this.notificationsByUser.put(4L, new ArrayList<NotificationData>(List.of(new NotificationData(3L, "\u4ea4\u6613\u5df2\u5b8c\u6210", "\u4f60\u7684\u5546\u54c1\u300a\u7fbd\u6bdb\u7403\u62cd\u4e00\u526f\u300b\u5bf9\u5e94\u9884\u7ea6\u5df2\u5b8c\u6210\uff0c\u5546\u54c1\u72b6\u6001\u5df2\u53d8\u66f4\u4e3a\u5df2\u552e\u51fa\u3002", "appointment_complete", true, 2L, LocalDateTime.now().minusDays(1L)))));
     }
 
-    public static final class UserData {
+    public static final class UserData implements Serializable {
         public final Long id;
         public final String username;
         public final String password;
@@ -999,7 +1183,7 @@ public class MarketStore {
         }
     }
 
-    public static final class GoodsData {
+    public static final class GoodsData implements Serializable {
         public final Long id;
         public final Long sellerId;
         public final String title;
@@ -1041,7 +1225,7 @@ public class MarketStore {
         }
     }
 
-    public static final class CommentData {
+    public static final class CommentData implements Serializable {
         public final Long id;
         public final Long goodsId;
         public final Long userId;
@@ -1059,7 +1243,7 @@ public class MarketStore {
         }
     }
 
-    public static final class WantedData {
+    public static final class WantedData implements Serializable {
         public final Long id;
         public final Long publisherId;
         public final String title;
@@ -1099,7 +1283,7 @@ public class MarketStore {
         }
     }
 
-    public static final class AnnouncementData {
+    public static final class AnnouncementData implements Serializable {
         public final Long id;
         public final String title;
         public final String summary;
@@ -1123,7 +1307,7 @@ public class MarketStore {
         }
     }
 
-    public static final class AppointmentData {
+    public static final class AppointmentData implements Serializable {
         public final Long id;
         public final Long goodsId;
         public final String goodsTitle;
@@ -1153,7 +1337,7 @@ public class MarketStore {
         }
     }
 
-    public static final class NotificationData {
+    public static final class NotificationData implements Serializable {
         public final Long id;
         public final String title;
         public final String content;
@@ -1173,7 +1357,7 @@ public class MarketStore {
         }
     }
 
-    public static final class CategoryData {
+    public static final class CategoryData implements Serializable {
         public final Long id;
         public final String name;
         public final int sortNum;
@@ -1189,7 +1373,7 @@ public class MarketStore {
         }
     }
 
-    public static final class BannerData {
+    public static final class BannerData implements Serializable {
         public final Long id;
         public final String title;
         public final String imageUrl;
@@ -1209,6 +1393,28 @@ public class MarketStore {
             this.enabled = enabled;
             this.deleted = deleted;
         }
+    }
+
+    private static final class MarketStoreSnapshot implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        private Map<Long, UserData> users;
+        private Map<Long, CategoryData> categories;
+        private Map<Long, GoodsData> goods;
+        private Map<Long, WantedData> wantedMap;
+        private Map<Long, AnnouncementData> announcements;
+        private Map<Long, BannerData> banners;
+        private Map<Long, List<CommentData>> commentsByGoods;
+        private Map<Long, LinkedHashSet<Long>> favoritesByUser;
+        private Map<Long, AppointmentData> appointments;
+        private Map<Long, List<NotificationData>> notificationsByUser;
+        private long userIdGenerator;
+        private long goodsIdGenerator;
+        private long wantedIdGenerator;
+        private long announcementIdGenerator;
+        private long commentIdGenerator;
+        private long appointmentIdGenerator;
+        private long notificationIdGenerator;
     }
 }
 
