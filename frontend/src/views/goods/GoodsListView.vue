@@ -304,6 +304,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useDebounceFn } from '@vueuse/core';
 import { getGoodsList, type GoodsItem } from '@/api/marketplace';
 import { useUserStore } from '@/stores/user';
 import { formatPrice } from '@/utils/format';
@@ -366,9 +367,12 @@ const syncKeywordQuery = async () => {
   await router.replace({ path: '/goods', query: nextQuery });
 };
 
+// 使用防抖优化搜索
+const debouncedSyncKeyword = useDebounceFn(syncKeywordQuery, 500);
+
 const handleSearch = () => {
   keyword.value = keyword.value.trim();
-  syncKeywordQuery();
+  debouncedSyncKeyword();
 };
 
 const pickKeyword = (value: string) => {

@@ -69,23 +69,28 @@ router.beforeEach((to) => {
   const userStore = useUserStore(pinia);
   document.title = to.meta.title ? `${to.meta.title} - 校园跳蚤市场 · 科成` : '校园跳蚤市场 · 科成';
 
+  // 公开路由，直接放行
   if (!to.meta.requiresAuth) {
     return true;
   }
 
+  // 需要登录但未登录，跳转到登录页
   if (!userStore.isLoggedIn) {
     ElMessage.warning('请先登录后再访问该页面');
     return { name: 'login', query: { redirect: to.fullPath } };
   }
 
+  // 管理员路由：只有管理员可以访问
   if (to.meta.role === 'admin' && userStore.role !== 'admin') {
     ElMessage.warning('当前账号没有后台访问权限');
-    return { name: 'user-dashboard' };
+    return { name: 'home' };
   }
 
-  if (to.meta.role === 'user' && userStore.role === 'admin') {
-    return { name: 'admin-dashboard' };
-  }
+  // 普通用户路由：管理员也可以访问（移除了之前的限制）
+  // 如果你希望管理员访问用户路由时自动跳转到管理后台，可以取消下面的注释
+  // if (to.meta.role === 'user' && userStore.role === 'admin') {
+  //   return { name: 'admin-dashboard' };
+  // }
 
   return true;
 });

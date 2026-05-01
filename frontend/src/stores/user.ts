@@ -71,4 +71,10 @@ export const useUserStore = defineStore('user', () => {
     updateProfile,
     logout,
   };
+}, {
+  persist: {
+    key: 'kecheng_market_user',
+    storage: localStorage,
+    paths: ['token', 'profile'],
+  },
 });

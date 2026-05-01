@@ -6,4 +6,4 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 market:
-  storage-mode: mysql
+  storage-mode: ${MARKET_STORAGE_MODE:memory}

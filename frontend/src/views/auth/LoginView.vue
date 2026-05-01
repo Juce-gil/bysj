@@ -7,7 +7,7 @@
       <ul>
         <li>支持进入前台、用户中心与后台管理三套视图</li>
         <li>当前已接入真实后端登录接口，可直接联调</li>
-        <li>可使用 admin / 123456 体验管理员，或 zhangsan / 123456 体验普通用户</li>
+        <li v-if="showTestAccounts">可使用 admin / 123456 体验管理员，或 zhangsan / 123456 体验普通用户</li>
       </ul>
     </section>
 
@@ -25,8 +25,8 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" class="submit-button" @click="handleSubmit">立即登录</el-button>
-          <el-button text @click="fillUserDemo">填入普通用户示例</el-button>
-          <el-button text @click="fillAdminDemo">填入管理员示例</el-button>
+          <el-button v-if="showTestAccounts" text @click="fillUserDemo">填入普通用户示例</el-button>
+          <el-button v-if="showTestAccounts" text @click="fillAdminDemo">填入管理员示例</el-button>
         </el-form-item>
       </el-form>
       <p class="subtle-text">还没有账号？<RouterLink to="/register">去注册</RouterLink></p>
@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, computed } from 'vue';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
@@ -50,6 +50,10 @@ const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 };
+
+// 从环境变量读取是否显示测试账号
+const showTestAccounts = computed(() => import.meta.env.VITE_SHOW_TEST_ACCOUNTS === 'true');
+
 const fillUserDemo = () => { form.username = 'zhangsan'; form.password = '123456'; };
 const fillAdminDemo = () => { form.username = 'admin'; form.password = '123456'; };
 const handleSubmit = async () => {
